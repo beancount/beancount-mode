@@ -1,0 +1,83 @@
+#+TITLE: Emacs major-mode to work with Beancount ledger files
+
+This package provides =beancount-mode= an Emacs [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Major-Modes.html][major-mode]]
+implementing syntax highlighting, indentation, completion , and other
+facilities to edit and work with Beancount ledger files.
+
+To instruct Emacs to activate =beancount-mode= when opening files with
+a ~.beancount~ extension, you can add this code to your Emacs
+configuration, typically in the =~/.emacs.d/init.el= file:
+
+#+begin_src elisp
+(add-to-list 'load-path "/path/to/beancount-mode/")
+(require 'beancount)
+(add-to-list 'auto-mode-alist '("\\.beancount\\'" . beancount-mode))
+#+end_src
+
+Most facilities commonly provided by Emacs major modes are implemented
+by =beancount-mode=. Documentation on the provided functionality and on
+the default keybindings can be obtained with the =describe-mode= command
+in a buffer with =beancount-mode= active.
+
+In a nutshell, when =beancount-mode= is active:
+
+- The "TAB" key either indents, completes, or folds the heading at
+  point, depending on the context.
+
+- Amounts in postings are indented so that the decimal point is at the
+  =beancount-number-alignment-column= column. Setting this variable to
+  0 will cause the alignment column to be determined from file
+  content.
+
+- Postings in transactions, as well as metadata, links, and tags
+  following directives, and are indented with
+  =beancount-transaction-indent= spaces.
+
+- Pressing the "RET" key causes the current line to be automatically
+  indented. If the current line is a posting, the amount will be
+  indented as described above.
+
+The automatic indentation behavior is defined by Emacs auto indent
+mechanism, however, it can be surprising or undesired. It can be
+disabled setting =electric-indent-chars= to =nil= after loading
+=beancount-mode=, for example like this:
+
+#+begin_src elisp
+(add-hook 'beancount-mode-hook
+  (lambda () (setq-local electric-indent-chars nil))
+#+end_src
+
+Beancount ledger files can grow very large. It is thus often practical
+to structure them in sections and subsections. To support this,
+=beancount-mode= leverages [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Outline-Mode.html][Outline minor-mode]] to enable navigation of
+the document structure to fold and unfold the document sections,
+similarly to what is possible in [[https://orgmode.org/][Org mode]]. Lines starting with one
+asterisks "=*=" or three or more semicolons "=;;;=" are interpreted as
+section headings. In Beancount, the semicolon starts a comment and all
+lines starting with an asterisks are ignored. The number of semicolons
+or asterisks determines the heading level.
+
+To enable this functionality, =outline-minor-mode= should be
+explicitly activated. It is possible to do so automatically when
+=beancout-mode= is activated:
+
+#+begin_src elisp
+(add-hook 'beancount-mode-hook #'outline-minor-mode)
+#+end_src
+
+Outline minor mode uses a rather peculiar choice of keybindings. It is
+possible to map the most used functionality to keys more familiar to
+=org-mode= users adding a few lines to the Emacs configuration:
+
+#+begin_src elisp
+(define-key beancount-mode-map (kbd "C-c C-n") #'outline-next-visible-heading)
+(define-key beancount-mode-map (kbd "C-c C-p") #'outline-previous-visible-heading)
+#+end_src
+
+Alternatively the keybindings for =outline-minor-mode= can be globally
+remapped. Please refer to the =outline-minor-mode= documentation in
+the Emacs manual for more details.
+
+The =etc/emacsrc= file contains some example configuration for
+=beancount-mode= and some experiments that may find their way into the
+main codebase.
