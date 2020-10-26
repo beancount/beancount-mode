@@ -4,7 +4,7 @@
 ;;
 
 ;; Add local emacs-lisp extension to load-path and load it.
-(add-to-list 'load-path (concat project-current "/editors/emacs"))
+(add-to-list 'load-path project-current)
 (require 'beancount)
 
 ;; Automatically open .beancount files in beancount-mode.
@@ -78,7 +78,7 @@
 (defvar beancount-journal-command
   (concat
    "select date, flag, maxwidth(description, 80), position, balance "
-   "where account = '%s'"))I
+   "where account = '%s'"))
 
 (defun beancount-query-journal-at-point ()
   "Run a journal command for the account at point."
