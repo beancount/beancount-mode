@@ -33,6 +33,7 @@
 (autoload 'ido-completing-read "ido")
 (require 'subr-x)
 (require 'outline)
+(require 'thingatpt)
 
 (defgroup beancount ()
   "Editing mode for Beancount files."
@@ -317,11 +318,11 @@ from the open directive for the relevant account."
 
   (setq-local tab-always-indent 'complete)
   (setq-local completion-ignore-case t)
-  
+
   (add-hook 'completion-at-point-functions #'beancount-completion-at-point nil t)
   (add-hook 'post-command-hook #'beancount-highlight-transaction-at-point nil t)
   (add-hook 'post-self-insert-hook #'beancount--electric-currency nil t)
-  
+
   (setq-local font-lock-defaults '(beancount-font-lock-keywords))
   (setq-local font-lock-syntax-table t)
 
@@ -839,14 +840,21 @@ Only useful if you have not installed Beancount properly in your PATH.")
                     (file-relative-name buffer-file-name)
                     (number-to-string (line-number-at-pos)))))
 
+;; Define a type for (thing-at-point) for Beancount links.
+(defvar beancount-link-chars "[:alnum:]-_\\.\\^"
+  "Characters allowable in Beancount links.")
+
+(define-thing-chars beancount-link beancount-link-chars)
 
 (defun beancount-linked ()
   "Get the \"linked\" info from `beancount-doctor-program'."
   (interactive)
-  (let ((compilation-read-command nil))
-    (beancount--run beancount-doctor-program "linked"
-                    (file-relative-name buffer-file-name)
-                    (number-to-string (line-number-at-pos)))))
+  (let* ((word (thing-at-point 'beancount-link))
+         (link (when (and word (string-match "\\^" word)) word)))
+    (let ((compilation-read-command nil))
+      (beancount--run beancount-doctor-program "linked"
+                      (file-relative-name buffer-file-name)
+                      (or link (number-to-string (line-number-at-pos)))))))
 
 (defvar beancount-price-program "bean-price"
   "Program to run the price fetching commands.")
