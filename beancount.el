@@ -285,6 +285,8 @@ from the open directive for the relevant account."
     (define-key map (vconcat p [(q)]) #'beancount-query)
     (define-key map (vconcat p [(x)]) #'beancount-context)
     (define-key map (vconcat p [(k)]) #'beancount-linked)
+    (define-key map (vconcat p [(r)]) #'beancount-region-default)
+    (define-key map (vconcat p [(t)]) #'beancount-region-value)
     (define-key map (vconcat p [(p)]) #'beancount-insert-prices)
     (define-key map (vconcat p [(\;)]) #'beancount-align-to-previous-number)
     (define-key map (vconcat p [(\:)]) #'beancount-align-numbers)
@@ -849,12 +851,38 @@ Only useful if you have not installed Beancount properly in your PATH.")
 (defun beancount-linked ()
   "Get the \"linked\" info from `beancount-doctor-program'."
   (interactive)
-  (let* ((word (thing-at-point 'beancount-link))
-         (link (when (and word (string-match "\\^" word)) word)))
-    (let ((compilation-read-command nil))
-      (beancount--run beancount-doctor-program "linked"
-                      (file-relative-name buffer-file-name)
-                      (or link (number-to-string (line-number-at-pos)))))))
+  (let ((lnarg (if mark-active
+                   (format "%d:%d"
+                           (line-number-at-pos (region-beginning))
+                           (line-number-at-pos (region-end)))
+                 (format "%d" (line-number-at-pos)))))
+    (let* ((word (thing-at-point 'beancount-link))
+           (link (when (and word (string-match "\\^" word)) word)))
+      (let ((compilation-read-command nil))
+        (beancount--run beancount-doctor-program "linked"
+                        buffer-file-name
+                        (or link lnarg))))))
+
+(defun beancount-region (rmin rmax &optional command)
+  "Get the info from \"region\" from `beancount-doctor-program'."
+  (when (use-region-p)
+    (let ((compilation-read-command nil)
+          (region-command (or command "region")))
+      (beancount--run beancount-doctor-program region-command
+                      buffer-file-name
+                      (format "%d:%d"
+                              (line-number-at-pos rmin)
+                              (line-number-at-pos
+                               (if (= 0 (save-excursion (goto-char rmax) (current-column)))
+                                   (1- rmax) rmax)))))))
+
+(defun beancount-region-default (rmin rmax)
+  (interactive "r")
+  (beancount-region rmin rmax "region"))
+
+(defun beancount-region-value (rmin rmax)
+  (interactive "r")
+  (beancount-region rmin rmax "region_value"))
 
 (defvar beancount-price-program "bean-price"
   "Program to run the price fetching commands.")
