@@ -1050,5 +1050,31 @@ Essentially a much simplified version of `next-line'."
               (get-char-property (1- (point)) 'invisible))
     (beginning-of-line 2)))
 
+;;; Fava
+
+(defvar beancount--fava-process nil)
+
+(defun beancount-fava ()
+  "Start (and open) or stop the fava server."
+  (interactive)
+  (if beancount--fava-process
+      (progn
+        (delete-process beancount--fava-process)
+        (setq beancount--fava-process nil)
+        (message "Fava process killed"))
+    (setq beancount--fava-process
+          (start-process "fava" (get-buffer-create "*fava*") "fava"
+                         (cond
+                          ((string= 'beancountmode major-mode)
+                           (buffer-file-name))
+                          (t (read-file-name "File to load: ")))))
+    (set-process-filter beancount--fava-process #'beancount--fava-filter)
+    (message "Fava process started")))
+
+(defun beancount--fava-filter (process output)
+  "Open fava url as soon as the address is announced."
+  (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
+      (browse-url (match-string 1 output))))
+
 (provide 'beancount)
 ;;; beancount.el ends here
