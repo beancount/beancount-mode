@@ -842,11 +842,14 @@ Only useful if you have not installed Beancount properly in your PATH.")
                     (file-relative-name buffer-file-name)
                     (number-to-string (line-number-at-pos)))))
 
-;; Define a type for (thing-at-point) for Beancount links.
-(defvar beancount-link-chars "[:alnum:]-_\\.\\^"
-  "Characters allowable in Beancount links.")
+(defun beancount--bounds-of-link-at-point ()
+  ;; There is no length limit for links but it seems reasonable to
+  ;; limit the search for the link to the 128 characters before and
+  ;; after the point. This number is chosen arbitrarily.
+  (when (thing-at-point-looking-at (concat "\\^[" beancount-tag-chars "]+") 128)
+    (cons (match-beginning 0) (match-end 0))))
 
-(define-thing-chars beancount-link beancount-link-chars)
+(put 'beancount-link 'bounds-of-thing-at-point #'beancount--bounds-of-link-at-point)
 
 (defun beancount-linked ()
   "Get the \"linked\" info from `beancount-doctor-program'."
