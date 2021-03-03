@@ -44,7 +44,7 @@ disabled setting =electric-indent-chars= to =nil= after loading
 
 #+begin_src elisp
 (add-hook 'beancount-mode-hook
-  (lambda () (setq-local electric-indent-chars nil))
+  (lambda () (setq-local electric-indent-chars nil)))
 #+end_src
 
 Beancount ledger files can grow very large. It is thus often practical
