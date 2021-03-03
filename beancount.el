@@ -1067,10 +1067,8 @@ Essentially a much simplified version of `next-line'."
         (message "Fava process killed"))
     (setq beancount--fava-process
           (start-process "fava" (get-buffer-create "*fava*") "fava"
-                         (cond
-                          ((string= 'beancountmode major-mode)
-                           (buffer-file-name))
-                          (t (read-file-name "File to load: ")))))
+                         (if (eq 'beancount-mode major-mode) (buffer-file-name)
+                           (read-file-name "File to load: "))))
     (set-process-filter beancount--fava-process #'beancount--fava-filter)
     (message "Fava process started")))
 
