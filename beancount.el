@@ -142,7 +142,11 @@ from the open directive for the relevant account."
 (defconst beancount-account-categories
   '("Assets" "Liabilities" "Equity" "Income" "Expenses"))
 
-(defconst beancount-tag-chars "[:alnum:]-_/.")
+(defconst beancount-tag-chars "[:alnum:]-_/."
+  "Characters allowable in Beancount tags.")
+
+(defconst beancount-link-chars "[:alnum:]-_/.^"
+  "Characters allowable in Beancount links.")
 
 (defconst beancount-account-chars "[:alnum:]-_:")
 
@@ -843,10 +847,8 @@ Only useful if you have not installed Beancount properly in your PATH.")
                     (number-to-string (line-number-at-pos)))))
 
 ;; Define a type for (thing-at-point) for Beancount links.
-(defvar beancount-link-chars "[:alnum:]-_\\.\\^"
-  "Characters allowable in Beancount links.")
-
 (define-thing-chars beancount-link beancount-link-chars)
+(define-thing-chars beancount-tag beancount-link-chars)
 
 (defun beancount-linked ()
   "Get the \"linked\" info from `beancount-doctor-program'."
@@ -857,32 +859,39 @@ Only useful if you have not installed Beancount properly in your PATH.")
                            (line-number-at-pos (region-end)))
                  (format "%d" (line-number-at-pos)))))
     (let* ((word (thing-at-point 'beancount-link))
-           (link (when (and word (string-match "\\^" word)) word)))
+           (tag-or-link (when (and word (string-match "\\^|\\#" word)) word)))
       (let ((compilation-read-command nil))
         (beancount--run beancount-doctor-program "linked"
                         buffer-file-name
-                        (or link lnarg))))))
+                        (or tag-or-link lnarg))))))
 
-(defun beancount-region (rmin rmax &optional command)
+(defun beancount-region (rmin rmax &rest args)
   "Get the info from \"region\" from `beancount-doctor-program'."
   (when (use-region-p)
     (let ((compilation-read-command nil)
-          (region-command (or command "region")))
-      (beancount--run beancount-doctor-program region-command
-                      buffer-file-name
-                      (format "%d:%d"
-                              (line-number-at-pos rmin)
-                              (line-number-at-pos
-                               (if (= 0 (save-excursion (goto-char rmax) (current-column)))
-                                   (1- rmax) rmax)))))))
+          (region-command "region"))
+      (apply #'beancount--run
+             beancount-doctor-program region-command
+             (append
+              (list buffer-file-name)
+              args
+              (list (format "%d:%d"
+                            (line-number-at-pos rmin)
+                            (line-number-at-pos
+                             (if (= 0 (save-excursion (goto-char rmax) (current-column)))
+                                 (1- rmax) rmax)))))))))
 
 (defun beancount-region-default (rmin rmax)
   (interactive "r")
-  (beancount-region rmin rmax "region"))
+  (beancount-region rmin rmax nil))
+
+(defun beancount-region-cost (rmin rmax)
+  (interactive "r")
+  (beancount-region rmin rmax "--conversion=cost"))
 
 (defun beancount-region-value (rmin rmax)
   (interactive "r")
-  (beancount-region rmin rmax "region_value"))
+  (beancount-region rmin rmax "--conversion=value"))
 
 (defvar beancount-price-program "bean-price"
   "Program to run the price fetching commands.")
