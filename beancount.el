@@ -3,11 +3,13 @@
 ;; Copyright (C) 2013 Martin Blais <blais@furius.ca>
 ;; Copyright (C) 2015 Free Software Foundation, Inc.
 ;; Copyright (C) 2019 Daniele Nicolodi <daniele@grinta.net>
+;; Copyright (C) 2021 Alex Smith <aes7mv@virginia.edu>
 
 ;; Version: 0
 ;; Author: Martin Blais <blais@furius.ca>
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Author: Daniele Nicolodi <daniele@grinta.net>
+;; Author: Alex Smith <aes7mv@virginia.edu>
 
 ;; This file is not part of GNU Emacs.
 

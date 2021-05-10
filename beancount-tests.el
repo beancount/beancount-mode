@@ -1,6 +1,7 @@
 ;;; beancount-test.el --- ERT for beancount-mode -*- lexical-binding: t -*-
 
 ;; Copyright 2019 Daniele Nicolodi <daniele@grinta.net>
+;; Copyright 2019 Alex Smith <aes7mv@virginia.edu>
 
 ;; This file is not part of GNU Emacs.
 
