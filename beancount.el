@@ -490,12 +490,14 @@ With an argument move to the next non cleared transaction."
          ;; that begin with something that looks like a
          ;; non-timestamped directive--don't match the beginning of
          ;; complete transactions)
-         ((beancount-looking-at "\\($\\|[a-z]+\\)" 0 pos)
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at "\\($\\|[a-z]+\\)" 0 pos))
           (list (match-beginning 0) (match-end 0) beancount-directive-names))
 
          ;; poptag
-         ((beancount-looking-at
-           (concat "poptag\\s-+\\(\\(?:#[" beancount-tag-chars "]*\\)\\)") 1 pos)
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
+                (concat "poptag\\s-+\\(\\(?:#[" beancount-tag-chars "]*\\)\\)") 1 pos))
           (list (match-beginning 1) (match-end 1)
                 (beancount-collect-pushed-tags (point-min) (point))))
 
@@ -506,15 +508,17 @@ With an argument move to the next non cleared transaction."
                 (mapcar (lambda (s) (concat "\"" s "\"")) beancount-option-names)))
 
          ;; timestamped directive
-         ((beancount-looking-at
-           (concat beancount-date-regexp "\\s-+\\([[:alpha:]]*\\)") 1 pos)
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
+                (concat beancount-date-regexp "\\s-+\\([[:alpha:]]*\\)") 1 pos))
           (list (match-beginning 1) (match-end 1) beancount-timestamped-directive-names))
 
          ;; timestamped directives followed by account
-         ((beancount-looking-at
-           (concat "^" beancount-date-regexp
-                   "\\s-+" (regexp-opt beancount-account-directive-names)
-                   "\\s-+\\([" beancount-account-chars "]*\\)") 1 pos)
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
+                (concat "^" beancount-date-regexp
+                        "\\s-+" (regexp-opt beancount-account-directive-names)
+                        "\\s-+\\([" beancount-account-chars "]*\\)") 1 pos))
           (setq beancount-accounts nil)
           (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table))
 
@@ -547,7 +551,8 @@ With an argument move to the next non cleared transaction."
             (list (match-beginning 0) (match-end 0) completion-table)))
 
          ;; posting
-         ((and (beancount-looking-at
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
                 (concat "[ \t]+\\([" beancount-account-chars "]*\\)") 1 pos)
                ;; Do not force the account name to start with a
                ;; capital, so that it is possible to use substring
