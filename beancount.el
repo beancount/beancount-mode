@@ -49,6 +49,11 @@ and price directives. Set to 0 to automatically determine the
 minimum column that will allow to align all amounts."
   :type 'integer)
 
+(defcustom beancount-alignment-sep-minimum 2
+  "Minimum number of spaces used to separate an aligned number
+from the preceding syntax element."
+  :type 'integer)
+
 (defcustom beancount-highlight-transaction-at-point nil
   "If t highlight transaction under point."
   :type 'boolean)
@@ -617,7 +622,8 @@ will allow to align all numbers."
       ;; Align the number if we got its bounds above
       (when number-beginning
         (let* ((prev-end-column (- prev-end (line-beginning-position)))
-               (spaces (max 2 (- target-column prev-end-column number-width))))
+               (spaces (max beancount-alignment-sep-minimum
+                            (- target-column prev-end-column number-width))))
           (unless (eq spaces (- number-beginning prev-end))
             (goto-char prev-end)
             (delete-region prev-end number-beginning)
@@ -636,7 +642,8 @@ will allow to align all numbers."
       ;; Align the currency if we got its bounds above
       (when currency-beginning
         (let* ((prev-end-column (- prev-end (line-beginning-position)))
-               (spaces (max 2 (- target-column prev-end-column))))
+               (spaces (max beancount-alignment-sep-minimum
+                        (- target-column prev-end-column))))
           (unless (eq spaces (- currency-beginning prev-end))
             (goto-char prev-end)
             (delete-region prev-end currency-beginning)
