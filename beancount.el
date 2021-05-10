@@ -33,6 +33,7 @@
 (autoload 'ido-completing-read "ido")
 (require 'subr-x)
 (require 'outline)
+(require 'org) ;; for org-level-x faces
 (require 'thingatpt)
 (require 'imenu)
 
