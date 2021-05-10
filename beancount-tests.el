@@ -238,6 +238,57 @@ known option nmaes."
 "))
     (should (equal beancount-accounts '("Assets:Checking" "Expenses:Test")))))
 
+(ert-deftest beancount-completion-002 ()
+  :tags '(completion regress)
+  (with-temp-buffer
+    (insert "
+2019-01-01 ope Assets:Checking
+")
+    (beancount-mode)
+    (search-backward "p")
+    (completion-at-point)
+    (should (equal (buffer-string) "
+2019-01-01 open Assets:Checking
+"))))
+
+(ert-deftest beancount-completion-003 ()
+  :tags '(completion regress)
+  (with-temp-buffer
+    (insert "
+option \"operating_ \"USD\"
+")
+    (beancount-mode)
+    (search-backward "p")
+    (completion-at-point)
+    (should (equal (buffer-string) "
+option \"operating_currency\" \"USD\"
+"))))
+
+(ert-deftest beancount-completion-004 ()
+  :tags '(completion regress)
+  (with-temp-buffer
+    (insert "
+2019-01-01 * \"Example ^foo-something-link-like-in-string\" ^foo-link/_.etc ^bar-link #foo-tag.more_/cruft #bar-tag
+  Expenses:Test    1.00 USD
+  Assets:Checking
+
+2019-01-01 * \"Example\" ^f #b
+")
+    (beancount-mode)
+    (goto-char (point-max))
+    (search-backward "^f")
+    (completion-at-point)
+    (goto-char (point-max))
+    (search-backward "#b")
+    (completion-at-point)
+    (should (equal (buffer-string) "
+2019-01-01 * \"Example ^foo-something-link-like-in-string\" ^foo-link/_.etc ^bar-link #foo-tag.more_/cruft #bar-tag
+  Expenses:Test    1.00 USD
+  Assets:Checking
+
+2019-01-01 * \"Example\" ^foo-link/_.etc #bar-tag
+"))))
+
 (ert-deftest beancount/outline-001 ()
   :tags '(outline)
   (with-temp-buffer
