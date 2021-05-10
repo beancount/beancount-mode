@@ -221,8 +221,14 @@ from the open directive for the relevant account."
   (concat "^\\(" beancount-date-regexp "\\) +"
           "\\(" (regexp-opt beancount-timestamped-directive-names) "\\) +"))
 
+(defconst beancount-metadata-base-regexp
+  "\\([a-z][A-Za-z0-9_-]+:\\)\\s-+\\(.+\\)")
+
 (defconst beancount-metadata-regexp
-  "^\\s-+\\([a-z][A-Za-z0-9_-]+:\\)\\s-+\\(.+\\)")
+  (concat "^\\s-+" beancount-metadata-base-regexp))
+
+(defconst beancount-metadata-indent-regexp
+  (concat "\\s-*" beancount-metadata-base-regexp))
 
 ;; This is a grouping regular expression because the subexpression is
 ;; used in determining the outline level in `beancount-outline-level'.
@@ -542,6 +548,19 @@ will allow to align all numbers."
      ((or (looking-at-p beancount-timestamp-indent-regexp)
           (looking-at-p beancount-directive-indent-regexp))
       0)
+     ;; Metadata lines should have an additional level of indentation
+     ;; if the previous line is a directive (timestamped or not) or a
+     ;; posting. Otherwise they should have the same level of
+     ;; indentation as the previous line.
+     ((looking-at-p beancount-metadata-indent-regexp)
+      (if (/= (forward-line -1) 0)
+          0
+        (if (or (looking-at-p beancount-transaction-regexp)
+                (looking-at-p beancount-directive-regexp)
+                (looking-at-p beancount-timestamped-directive-regexp)
+                (looking-at-p beancount-posting-regexp))
+            (+ (current-indentation) beancount-transaction-indent)
+          (current-indentation))))
      ;; Otherwise look at the previous line.
      ((and (= (forward-line -1) 0)
            (or (looking-at-p "[ \t].+")
