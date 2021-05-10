@@ -457,8 +457,7 @@ With an argument move to the next non cleared transaction."
         (cond
          ;; non timestamped directive
          ((beancount-looking-at "[a-z]*" 0 pos)
-          (list (match-beginning 0) (match-end 0)
-                (mapcar (lambda (s) (concat s " ")) beancount-directive-names)))
+          (list (match-beginning 0) (match-end 0) beancount-directive-names))
 
          ;; poptag
          ((beancount-looking-at
@@ -468,15 +467,14 @@ With an argument move to the next non cleared transaction."
 
          ;; option
          ((beancount-looking-at
-           (concat "^option\\s-+\\(\"[a-z_]*\\)") 1 pos)
+           (concat "^option\\s-+\\(\\(?:\"[a-z_]*\"?\\)?\\)") 1 pos)
           (list (match-beginning 1) (match-end 1)
-                (mapcar (lambda (s) (concat "\"" s "\" ")) beancount-option-names)))
+                (mapcar (lambda (s) (concat "\"" s "\"")) beancount-option-names)))
 
          ;; timestamped directive
          ((beancount-looking-at
            (concat beancount-date-regexp "\\s-+\\([[:alpha:]]*\\)") 1 pos)
-          (list (match-beginning 1) (match-end 1)
-                (mapcar (lambda (s) (concat s " ")) beancount-timestamped-directive-names)))
+          (list (match-beginning 1) (match-end 1) beancount-timestamped-directive-names))
 
          ;; timestamped directives followed by account
          ((beancount-looking-at
