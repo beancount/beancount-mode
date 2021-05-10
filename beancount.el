@@ -353,7 +353,7 @@ from the open directive for the relevant account."
   :syntax-table beancount-mode-syntax-table
 
   (setq-local paragraph-ignore-fill-prefix t)
-  (setq-local fill-paragraph-function #'beancount-indent-transaction)
+  (setq-local fill-paragraph-function #'beancount-indent-directive)
 
   (setq-local comment-start ";")
   (setq-local comment-start-skip ";+\\s-*")
@@ -677,6 +677,48 @@ will allow to align all numbers."
           (beancount-indent-line))
         (forward-line 1))
       (move-marker end nil))))
+
+(defun beancount-goto-directive-begin ()
+  "Move the cursor to the first line of the directive definition."
+  (interactive)
+  (beginning-of-line)
+  ;; Loop backwards until we see a timestamped directive, a
+  ;; non-timestamped directive, or we hit the beginning of the file
+  (while (and (not (or (looking-at-p beancount-timestamp-indent-regexp)
+                       (looking-at-p beancount-directive-indent-regexp)))
+              (eq (forward-line -1) 0)))
+  (point))
+
+(defun beancount-goto-directive-end ()
+  "Move the cursor to the line after the directive definition."
+  (interactive)
+  (beginning-of-line)
+  ;; If we start at the beginning of a directive, skip to the next
+  ;; line
+  (when (or (looking-at-p beancount-timestamp-indent-regexp)
+            (looking-at-p beancount-directive-indent-regexp))
+    (forward-line))
+  ;; Loop forwards until we see a whitespace-only line, timestamped
+  ;; directive, a non-timestamped directive, or we hit the end of the
+  ;; file
+  (while (and (not (or (looking-at-p "\\s-*$")
+                       (looking-at-p beancount-timestamp-indent-regexp)
+                       (looking-at-p beancount-directive-indent-regexp)))
+              (eq (forward-line) 0)))
+  (point))
+
+(defun beancount-find-directive-extents (p)
+  (save-excursion
+    (goto-char p)
+    (list (beancount-goto-directive-begin)
+          (beancount-goto-directive-end))))
+
+(defun beancount-indent-directive (&optional _justify _region)
+  "Indent Beancount directive at point."
+  (interactive)
+  (save-excursion
+    (let ((bounds (beancount-find-directive-extents (point))))
+      (beancount-indent-region (car bounds) (cadr bounds)))))
 
 (defun beancount-indent-transaction (&optional _justify _region)
   "Indent Beancount transaction at point."
