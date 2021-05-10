@@ -372,5 +372,5 @@ known option nmaes."
   :tags '(regress thing-at-point)
   (with-temp-buffer
     (insert "foo ^link baz")
-    (goto-char 15)
+    (goto-char 5)
     (should (equal (thing-at-point 'beancount-link) "^link"))))
