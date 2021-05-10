@@ -54,6 +54,10 @@ minimum column that will allow to align all amounts."
 from the preceding syntax element."
   :type 'integer)
 
+(defcustom beancount-tab-dwim-indent-align-numbers nil
+  "If t align numbers when indenting via beancount-tab-dwim."
+  :type 'boolean)
+
 (defcustom beancount-highlight-transaction-at-point nil
   "If t highlight transaction under point."
   :type 'boolean)
@@ -655,7 +659,8 @@ will allow to align all numbers."
     (unless (eq indent (current-indentation))
       (if savep (save-excursion (indent-line-to indent))
         (indent-line-to indent)))
-    (unless (eq this-command 'beancount-tab-dwim)
+    (unless (and (eq this-command 'beancount-tab-dwim)
+                 (not beancount-tab-dwim-indent-align-numbers))
       (beancount-align-number (beancount-number-alignment-column))
       (beancount-align-currency (+ (beancount-number-alignment-column) 1)))))
 
