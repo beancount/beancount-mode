@@ -518,17 +518,6 @@ With an argument move to the next non cleared transaction."
           (setq beancount-accounts nil)
           (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table))
 
-         ;; posting
-         ((and (beancount-looking-at
-                (concat "[ \t]+\\([" beancount-account-chars "]*\\)") 1 pos)
-               ;; Do not force the account name to start with a
-               ;; capital, so that it is possible to use substring
-               ;; completion and we can rely on completion to fix
-               ;; capitalization thanks to completion-ignore-case.
-               (beancount-inside-transaction-p))
-          (setq beancount-accounts nil)
-          (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table))
-
          ;; tags
          ((save-excursion
             (goto-char pos)
@@ -555,7 +544,18 @@ With an argument move to the next non cleared transaction."
                         (setq candidates
                               (sort (beancount-collect regexp 0) #'string<)))
                     (complete-with-action action candidates string pred))))
-            (list (match-beginning 0) (match-end 0) completion-table))))))))
+            (list (match-beginning 0) (match-end 0) completion-table)))
+
+         ;; posting
+         ((and (beancount-looking-at
+                (concat "[ \t]+\\([" beancount-account-chars "]*\\)") 1 pos)
+               ;; Do not force the account name to start with a
+               ;; capital, so that it is possible to use substring
+               ;; completion and we can rely on completion to fix
+               ;; capitalization thanks to completion-ignore-case.
+               (beancount-inside-transaction-p))
+          (setq beancount-accounts nil)
+          (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table)))))))
 
 (defun beancount-collect (regexp n)
   "Return an unique list of REGEXP group N in the current buffer."
