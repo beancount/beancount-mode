@@ -222,6 +222,13 @@ from the open directive for the relevant account."
           "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
           "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
 
+(defconst beancount-open-regexp
+  (concat "^\\(" beancount-date-regexp "\\) +"
+          "\\(open\\) +"
+          "\\(" beancount-account-regexp "\\)"
+          "\\(?:\\s-+\\(\\(" beancount-currency-regexp "\\)"
+          "\\(?:,\\(" beancount-currency-regexp "\\)\\)*\\)\\)?"))
+
 (defconst beancount-directive-base-regexp
   (concat "\\(" (regexp-opt beancount-directive-names) "\\) +"))
 
@@ -616,6 +623,24 @@ will allow to align all numbers."
             (delete-region prev-end number-beginning)
             (insert (make-string spaces ? ))))))))
 
+(defun beancount-align-currency (target-column)
+  (save-excursion
+    (beginning-of-line)
+    (let (prev-end currency-beginning)
+      (cond
+       ;; Grab the bounds if this is an open directive
+       ((and (looking-at beancount-open-regexp)
+             (match-string 5))
+        (setq prev-end (match-end 3)
+              currency-beginning (match-beginning 5))))
+      ;; Align the currency if we got its bounds above
+      (when currency-beginning
+        (let* ((prev-end-column (- prev-end (line-beginning-position)))
+               (spaces (max 2 (- target-column prev-end-column))))
+          (unless (eq spaces (- currency-beginning prev-end))
+            (goto-char prev-end)
+            (delete-region prev-end currency-beginning)
+            (insert (make-string spaces ? ))))))))
 
 (defun beancount-indent-line ()
   (let ((indent (beancount-compute-indentation))
@@ -624,7 +649,8 @@ will allow to align all numbers."
       (if savep (save-excursion (indent-line-to indent))
         (indent-line-to indent)))
     (unless (eq this-command 'beancount-tab-dwim)
-      (beancount-align-number (beancount-number-alignment-column)))))
+      (beancount-align-number (beancount-number-alignment-column))
+      (beancount-align-currency (+ (beancount-number-alignment-column) 1)))))
 
 (defun beancount-indent-region (start end)
   "Indent a region automagically. START and END specify the region to indent."
