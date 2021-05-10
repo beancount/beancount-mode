@@ -155,6 +155,16 @@ from the open directive for the relevant account."
 
 (defconst beancount-tag-chars "[:alnum:]-_/.")
 
+(defvar beancount-tag-char-table (make-char-table 'tag-table)
+  "char-table with non-nil values only for characters allowed in tags")
+(set-char-table-range beancount-tag-char-table (cons ?a  ?z) t)
+(set-char-table-range beancount-tag-char-table (cons ?A  ?Z) t)
+(set-char-table-range beancount-tag-char-table (cons ?0  ?9) t)
+(set-char-table-range beancount-tag-char-table ?- t)
+(set-char-table-range beancount-tag-char-table ?_ t)
+(set-char-table-range beancount-tag-char-table ?/ t)
+(set-char-table-range beancount-tag-char-table ?. t)
+
 (defconst beancount-account-chars "[:alnum:]-_:")
 
 (defconst beancount-option-names
@@ -448,6 +458,27 @@ With an argument move to the next non cleared transaction."
   "A list of the accounts available in this buffer.")
 (make-variable-buffer-local 'beancount-accounts)
 
+(defun beancount-inside-string-p ()
+  (nth 3 (syntax-ppss)))
+
+(defun beancount-looking-at-tag-generic (start-char start-char-string)
+  (save-excursion
+    (unless (beancount-inside-string-p)
+      ;; Loop backward until the previous character is not a valid tag
+      ;; character
+      (while (char-table-range beancount-tag-char-table (char-before))
+        (backward-char))
+      ;; Move before the start character if we hit it
+      (when (eq (char-before) start-char)
+        (backward-char))
+      (looking-at (concat start-char-string "[" beancount-tag-chars "]*")))))
+
+(defun beancount-looking-at-tag ()
+  (beancount-looking-at-tag-generic ?# "#"))
+
+(defun beancount-looking-at-link ()
+  (beancount-looking-at-tag-generic ?^ "\\^"))
+
 (defun beancount-completion-at-point ()
   "Return the completion data relevant for the text at point."
   (save-excursion
@@ -499,30 +530,32 @@ With an argument move to the next non cleared transaction."
           (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table))
 
          ;; tags
-         ((beancount-looking-at
-           (concat "[ \t]+#\\([" beancount-tag-chars "]*\\)") 1 pos)
+         ((save-excursion
+            (goto-char pos)
+            (beancount-looking-at-tag))
           (let* ((candidates nil)
-                 (regexp (concat "\\#\\([" beancount-tag-chars "]+\\)"))
+                 (regexp (concat "#[" beancount-tag-chars "]+"))
                  (completion-table
                   (lambda (string pred action)
                     (if (null candidates)
                         (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
+                              (sort (beancount-collect regexp 0) #'string<)))
                     (complete-with-action action candidates string pred))))
-            (list (match-beginning 1) (match-end 1) completion-table)))
+            (list (match-beginning 0) (match-end 0) completion-table)))
 
          ;; links
-         ((beancount-looking-at
-           (concat "[ \t]+\\^\\([" beancount-tag-chars "]*\\)") 1 pos)
+         ((save-excursion
+            (goto-char pos)
+            (beancount-looking-at-link))
           (let* ((candidates nil)
-                 (regexp (concat "\\^\\([" beancount-tag-chars "]+\\)"))
+                 (regexp (concat "\\^[" beancount-tag-chars "]+"))
                  (completion-table
                   (lambda (string pred action)
                     (if (null candidates)
                         (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
+                              (sort (beancount-collect regexp 0) #'string<)))
                     (complete-with-action action candidates string pred))))
-            (list (match-beginning 1) (match-end 1) completion-table))))))))
+            (list (match-beginning 0) (match-end 0) completion-table))))))))
 
 (defun beancount-collect (regexp n)
   "Return an unique list of REGEXP group N in the current buffer."
@@ -990,10 +1023,7 @@ Only useful if you have not installed Beancount properly in your PATH.")
                     (number-to-string (line-number-at-pos)))))
 
 (defun beancount--bounds-of-link-at-point ()
-  ;; There is no length limit for links but it seems reasonable to
-  ;; limit the search for the link to the 128 characters before and
-  ;; after the point. This number is chosen arbitrarily.
-  (when (thing-at-point-looking-at (concat "\\^[" beancount-tag-chars "]+") 128)
+  (when (beancount-looking-at-link)
     (cons (match-beginning 0) (match-end 0))))
 
 (put 'beancount-link 'bounds-of-thing-at-point #'beancount--bounds-of-link-at-point)
