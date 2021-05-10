@@ -34,6 +34,7 @@
 (require 'subr-x)
 (require 'outline)
 (require 'thingatpt)
+(require 'imenu)
 
 (defgroup beancount ()
   "Editing mode for Beancount files."
