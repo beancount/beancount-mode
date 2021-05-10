@@ -133,21 +133,71 @@ Return a list of substrings each followed by its face."
   :tags '(indent regress)
   (with-temp-buffer
     (insert "
-2019-01-01 * \"Example\"
+ 2019-01-01 * \"Example\"
+transaction: metadata
   #foo
     ^bar
+      also_transaction: metadata
   Expenses:Example  1.00 USD
-    Assets:Checking           1.00 USD
+            posting: metadata
+also_posting: metadata
+    Assets:Checking          -1.00 USD
+  second_posting: metadata
 ")
     (beancount-mode)
     (forward-line -1)
-    (beancount-indent-transaction)
+    (beancount-indent-directive)
     (should (equal (buffer-string) "
 2019-01-01 * \"Example\"
+  transaction: metadata
   #foo
   ^bar
+  also_transaction: metadata
   Expenses:Example                              1.00 USD
-  Assets:Checking                               1.00 USD
+    posting: metadata
+    also_posting: metadata
+  Assets:Checking                              -1.00 USD
+    second_posting: metadata
+"))))
+
+(ert-deftest beancount/indent-002 ()
+  :tags '(indent regress)
+  (with-temp-buffer
+    (insert "
+   2019-01-01 open Assets:Checking  USD
+
+ 2019-01-01 * \"Example\"
+transaction: metadata
+  #foo
+    ^bar
+      also_transaction: metadata
+  Expenses:Example  1.00 USD
+            posting: metadata
+also_posting: metadata
+    Assets:Checking          -1.00 USD
+  second_posting: metadata
+   2019-01-02 balance Assets:Checking  -1.00 USD
+
+ 2019-01-03 price FOOBAR   123.456 USD
+")
+    (beancount-mode)
+    (indent-region (point-min) (point-max))
+    (should (equal (buffer-string) "
+2019-01-01 open Assets:Checking                      USD
+
+2019-01-01 * \"Example\"
+  transaction: metadata
+  #foo
+  ^bar
+  also_transaction: metadata
+  Expenses:Example                              1.00 USD
+    posting: metadata
+    also_posting: metadata
+  Assets:Checking                              -1.00 USD
+    second_posting: metadata
+2019-01-02 balance Assets:Checking             -1.00 USD
+
+2019-01-03 price FOOBAR                      123.456 USD
 "))))
 
 (ert-deftest beancount/options-001 ()
