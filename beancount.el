@@ -178,6 +178,9 @@ from the open directive for the relevant account."
 (defconst beancount-date-regexp "[0-9]\\{4\\}[-/][0-9]\\{2\\}[-/][0-9]\\{2\\}"
   "A regular expression to match dates.")
 
+(defconst beancount-timestamp-indent-regexp
+  (concat "\\s-*" beancount-date-regexp))
+
 (defconst beancount-account-regexp
   (concat (regexp-opt beancount-account-categories)
           "\\(?::[[:upper:]][[:alnum:]-_]+\\)+")
@@ -205,8 +208,14 @@ from the open directive for the relevant account."
           "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
           "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
 
+(defconst beancount-directive-base-regexp
+  (concat "\\(" (regexp-opt beancount-directive-names) "\\) +"))
+
 (defconst beancount-directive-regexp
-  (concat "^\\(" (regexp-opt beancount-directive-names) "\\) +"))
+  (concat "^" beancount-directive-base-regexp))
+
+(defconst beancount-directive-indent-regexp
+  (concat "\\s-*" beancount-directive-base-regexp))
 
 (defconst beancount-timestamped-directive-regexp
   (concat "^\\(" beancount-date-regexp "\\) +"
@@ -527,8 +536,12 @@ will allow to align all numbers."
   (save-excursion
     (beginning-of-line)
     (cond
-     ;; Only timestamped directives start with a digit.
-     ((looking-at-p "[0-9]") 0)
+     ;; Lines which begin with a timestamp or a non-timestamped
+     ;; directive get indented to the beginning of the line.
+     ;; Consider: use "\\s-*[0-9]" instead of full timestamp regexp
+     ((or (looking-at-p beancount-timestamp-indent-regexp)
+          (looking-at-p beancount-directive-indent-regexp))
+      0)
      ;; Otherwise look at the previous line.
      ((and (= (forward-line -1) 0)
            (or (looking-at-p "[ \t].+")
