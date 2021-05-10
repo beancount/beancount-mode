@@ -571,9 +571,12 @@ With an argument move to the next non cleared transaction."
           (goto-char (point-min))
           (while (re-search-forward regexp nil t)
             ;; Ignore matches around `pos' (the point position when
-            ;; entering this funcyion) since that's presumably what
+            ;; entering this function) since that's presumably what
             ;; we're currently trying to complete.
-            (unless (<= (match-beginning 0) pos (match-end 0))
+            ;; Also ignore matches inside strings (Consider: allow
+            ;; caller to specify this behavior).
+            (unless (or (<= (match-beginning 0) pos (match-end 0))
+                        (beancount-inside-string-p))
               (puthash (match-string-no-properties n) nil hash)))
           (hash-table-keys hash))))))
 
