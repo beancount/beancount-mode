@@ -455,8 +455,11 @@ With an argument move to the next non cleared transaction."
       (let ((pos (point)))
         (beginning-of-line)
         (cond
-         ;; non timestamped directive
-         ((beancount-looking-at "[a-z]*" 0 pos)
+         ;; non timestamped directive (only match empty lines or lines
+         ;; that begin with something that looks like a
+         ;; non-timestamped directive--don't match the beginning of
+         ;; complete transactions)
+         ((beancount-looking-at "\\($\\|[a-z]+\\)" 0 pos)
           (list (match-beginning 0) (match-end 0) beancount-directive-names))
 
          ;; poptag
