@@ -44,9 +44,9 @@
   :type 'integer)
 
 (defcustom beancount-number-alignment-column 52
-  "Column to which align numbers in postinng definitions. Set to
-0 to automatically determine the minimum column that will allow
-to align all amounts."
+  "Column to which align numbers in postings, balance directives,
+and price directives. Set to 0 to automatically determine the
+minimum column that will allow to align all amounts."
   :type 'integer)
 
 (defcustom beancount-highlight-transaction-at-point nil
@@ -205,6 +205,20 @@ from the open directive for the relevant account."
 (defconst beancount-posting-regexp
   (concat "^\\s-+"
           "\\(" beancount-account-regexp "\\)"
+          "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
+          "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
+
+(defconst beancount-balance-regexp
+  (concat "^\\(" beancount-date-regexp "\\) +"
+          "\\(balance\\) +"
+          "\\(" beancount-account-regexp "\\)"
+          "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
+          "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
+
+(defconst beancount-price-regexp
+  (concat "^\\(" beancount-date-regexp "\\) +"
+          "\\(price\\) +"
+          "\\(" beancount-currency-regexp "\\)"
           "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
           "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
 
@@ -573,18 +587,35 @@ will allow to align all numbers."
 (defun beancount-align-number (target-column)
   (save-excursion
     (beginning-of-line)
-    ;; Check if the current line is a posting with a number to align.
-    (when (and (looking-at beancount-posting-regexp)
-               (match-string 2))
-      (let* ((account-end-column (- (match-end 1) (line-beginning-position)))
-             (number-width (- (match-end 3) (match-beginning 3)))
-             (account-end (match-end 1))
-             (number-beginning (match-beginning 3))
-             (spaces (max 2 (- target-column account-end-column number-width))))
-        (unless (eq spaces (- number-beginning account-end))
-          (goto-char account-end)
-          (delete-region account-end number-beginning)
-          (insert (make-string spaces ? )))))))
+    (let (prev-end number-beginning number-width)
+      (cond
+       ;; Grab bounds if this is a posting
+       ((and (looking-at beancount-posting-regexp)
+             (match-string 2))
+        (setq prev-end (match-end 1)
+              number-beginning (match-beginning 3)
+              number-width (- (match-end 3) (match-beginning 3))))
+       ;; Grab bounds if this is a balance directive
+       ((and (looking-at beancount-balance-regexp)
+             (match-string 4))
+        (setq prev-end (match-end 3)
+              number-beginning (match-beginning 5)
+              number-width (- (match-end 5) (match-beginning 5))))
+       ;; Grab bounds if this is a price directive
+       ((and (looking-at beancount-price-regexp)
+             (match-string 4))
+        (setq prev-end (match-end 3)
+              number-beginning (match-beginning 5)
+              number-width (- (match-end 5) (match-beginning 5)))))
+      ;; Align the number if we got its bounds above
+      (when number-beginning
+        (let* ((prev-end-column (- prev-end (line-beginning-position)))
+               (spaces (max 2 (- target-column prev-end-column number-width))))
+          (unless (eq spaces (- number-beginning prev-end))
+            (goto-char prev-end)
+            (delete-region prev-end number-beginning)
+            (insert (make-string spaces ? ))))))))
+
 
 (defun beancount-indent-line ()
   (let ((indent (beancount-compute-indentation))
