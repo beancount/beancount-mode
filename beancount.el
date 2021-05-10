@@ -311,7 +311,8 @@ from the open directive for the relevant account."
 
 (defun beancount-tab-dwim (&optional arg)
   (interactive "P")
-  (if (and outline-minor-mode
+  (if (and (not (use-region-p))
+           outline-minor-mode
            (or arg (outline-on-heading-p)))
       (beancount-outline-cycle arg)
     (indent-for-tab-command)))
