@@ -129,6 +129,15 @@ Return a list of substrings each followed by its face."
      "1.00 USD"         beancount-amount
      "Assets:Checking"  beancount-account)))
 
+(ert-deftest beancount/fontify-005 ()
+  :tags '(font regress)
+  (beancount-test-font-lock "
+2019-01-01 open Assets:TD:TDB900 TDB900
+"
+   '("2019-01-01"       beancount-date
+     "open"             beancount-directive
+     "Assets:TD:TDB900" beancount-account)))
+
 (ert-deftest beancount/indent-001 ()
   :tags '(indent regress)
   (with-temp-buffer
