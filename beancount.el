@@ -753,15 +753,20 @@ what that column is and returns it (an integer)."
 
 (defun beancount--account-currency (account)
   ;; Build a regexp that matches an open directive that specifies a
-  ;; single account currencydaaee. The currency is match group 1.
-  (let ((re (concat "^" beancount-date-regexp " +open"
-                    "\\s-+" (regexp-quote account)
-                    "\\s-+\\(" beancount-currency-regexp "\\)\\s-+")))
-    (save-excursion
-      (goto-char (point-min))
-      (when (re-search-forward re nil t)
-        ;; The account has declared a single currency, so we can fill it in.
-        (match-string-no-properties 1)))))
+  ;; single account currency. The currency is match group 1.
+  (save-excursion
+    (goto-char (point-min))
+    (and (or (re-search-forward
+              (concat "^" beancount-date-regexp " +open"
+                      "\\s-+" (regexp-quote account)
+                      "\\s-+\\(" beancount-currency-regexp "\\)\\>")
+              nil t)
+             (re-search-forward
+              (concat "^option\\s-+\"operating_currency\"\\s-+\"\\("
+                      beancount-currency-regexp
+                      "\\)\"")
+              nil t))
+         (match-string-no-properties 1))))
 
 (defun beancount--electric-currency ()
   (when (and beancount-electric-currency (eq last-command-event ?\n))
