@@ -109,6 +109,38 @@ from the open directive for the relevant account."
   `((t :inherit highlight))
   "Face to highlight Beancount transaction at point.")
 
+(defface beancount-outline-1
+  `((t :inherit outline-1))
+  "First level of `outline-minor-mode' headings in `beancount-mode'."
+
+(defface beancount-outline-2
+  `((t :inherit outline-2))
+  "Second level of `outline-minor-mode' headings in `beancount-mode'."
+
+(defface beancount-outline-3
+  `((t :inherit outline-3))
+  "Third level of `outline-minor-mode' headings in `beancount-mode'."
+
+(defface beancount-outline-4
+  `((t :inherit outline-4))
+  "Fourth level of `outline-minor-mode' headings in `beancount-mode'."
+
+(defface beancount-outline-5
+  `((t :inherit outline-5))
+  "Fifth level of `outline-minor-mode' headings in `beancount-mode'."
+
+(defface beancount-outline-6
+  `((t :inherit outline-6))
+  "Sixth level of `outline-minor-mode' headings in `beancount-mode'."
+
+(defface beancount-outline-7
+  `((t :inherit outline-7))
+  "Seventh level of `outline-minor-mode' headings in `beancount-mode'."
+
+(defface beancount-outline-8
+  `((t :inherit outline-8))
+  "Eighth level of `outline-minor-mode' headings in `beancount-mode'."
+
 (defconst beancount-account-directive-names
   '("balance"
     "close"
@@ -233,13 +265,15 @@ from the open directive for the relevant account."
 (defun beancount-outline-face ()
   (if outline-minor-mode
       (cl-case (funcall outline-level)
-      (1 'org-level-1)
-      (2 'org-level-2)
-      (3 'org-level-3)
-      (4 'org-level-4)
-      (5 'org-level-5)
-      (6 'org-level-6)
-      (otherwise nil))
+        (1 'beancount-outline-1)
+        (2 'beancount-outline-2)
+        (3 'beancount-outline-3)
+        (4 'beancount-outline-4)
+        (5 'beancount-outline-5)
+        (6 'beancount-outline-6)
+        (7 'beancount-outline-7)
+        (8 'beancount-outline-8)
+        (otherwise nil))
     nil))
 
 (defvar beancount-font-lock-keywords
