@@ -63,6 +63,10 @@ complete the posting at point. The correct currency is determined
 from the open directive for the relevant account."
   :type 'boolean)
 
+(defcustom beancount-electric-align nil
+  "If non-nil, align currency to `beancount-number-alignment-column' on newline."
+  :type 'boolean)
+
 (defgroup beancount-faces nil "Beancount mode highlighting" :group 'beancount)
 
 (defface beancount-directive
@@ -323,7 +327,7 @@ from the open directive for the relevant account."
 
   (add-hook 'completion-at-point-functions #'beancount-completion-at-point nil t)
   (add-hook 'post-command-hook #'beancount-highlight-transaction-at-point nil t)
-  (add-hook 'post-self-insert-hook #'beancount--electric-currency nil t)
+  (add-hook 'post-self-insert-hook #'beancount--electric nil t)
 
   (setq-local font-lock-defaults '(beancount-font-lock-keywords))
   (setq-local font-lock-syntax-table t)
@@ -763,21 +767,26 @@ what that column is and returns it (an integer)."
         ;; The account has declared a single currency, so we can fill it in.
         (match-string-no-properties 1)))))
 
-(defun beancount--electric-currency ()
-  (when (and beancount-electric-currency (eq last-command-event ?\n))
+(defun beancount--electric ()
+  (when (and (eq last-command-event ?\n)
+             (or beancount-electric-currency
+                 beancount-electric-align))
     (save-excursion
       (forward-line -1)
-      (when (and (beancount-inside-transaction-p)
-                 (looking-at (concat "\\s-+\\(" beancount-account-regexp "\\)"
-                                     "\\s-+\\(" beancount-number-regexp "\\)\\s-*$")))
-        ;; Last line is a posting without currency.
-        (let* ((account (match-string 1))
-               (pos (match-end 0))
-               (currency (beancount--account-currency account)))
-          (when currency
-            (save-excursion
-	      (goto-char pos)
-              (insert " " currency))))))))
+      (when (beancount-inside-transaction-p)
+        (when (and beancount-electric-currency
+                   (looking-at (concat "\\s-+\\(" beancount-account-regexp "\\)"
+                                       "\\s-+\\(" beancount-number-regexp "\\)\\s-*$")))
+          ;; Last line is a posting without currency.
+          (let* ((account (match-string 1))
+                 (pos (match-end 0))
+                 (currency (beancount--account-currency account)))
+            (when currency
+              (save-excursion
+                (goto-char pos)
+                (insert " " currency)))))
+        (when beancount-electric-align
+          (beancount-align-number (beancount-number-alignment-column)))))))
 
 (defun beancount-insert-date ()
   "Start a new timestamped directive."
