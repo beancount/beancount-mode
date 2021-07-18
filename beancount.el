@@ -111,35 +111,35 @@ from the open directive for the relevant account."
 
 (defface beancount-outline-1
   `((t :inherit outline-1))
-  "First level of `outline-minor-mode' headings in `beancount-mode'."
+  "First level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defface beancount-outline-2
   `((t :inherit outline-2))
-  "Second level of `outline-minor-mode' headings in `beancount-mode'."
+  "Second level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defface beancount-outline-3
   `((t :inherit outline-3))
-  "Third level of `outline-minor-mode' headings in `beancount-mode'."
+  "Third level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defface beancount-outline-4
   `((t :inherit outline-4))
-  "Fourth level of `outline-minor-mode' headings in `beancount-mode'."
+  "Fourth level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defface beancount-outline-5
   `((t :inherit outline-5))
-  "Fifth level of `outline-minor-mode' headings in `beancount-mode'."
+  "Fifth level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defface beancount-outline-6
   `((t :inherit outline-6))
-  "Sixth level of `outline-minor-mode' headings in `beancount-mode'."
+  "Sixth level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defface beancount-outline-7
   `((t :inherit outline-7))
-  "Seventh level of `outline-minor-mode' headings in `beancount-mode'."
+  "Seventh level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defface beancount-outline-8
   `((t :inherit outline-8))
-  "Eighth level of `outline-minor-mode' headings in `beancount-mode'."
+  "Eighth level of `outline-minor-mode' headings in `beancount-mode'.")
 
 (defconst beancount-account-directive-names
   '("balance"
