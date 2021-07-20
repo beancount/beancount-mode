@@ -17,6 +17,7 @@
 
 (require 'ert)
 (require 'beancount)
+(require 'imenu)
 
 (ert-deftest beancount/smoke-001 ()
   :tags '(regress)
