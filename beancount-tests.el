@@ -239,9 +239,9 @@ known option nmaes."
            (font-lock-ensure)
            (buffer-string))))
     (should (equal (beancount-test-face-groups fontified)
-                   '("* A"   org-level-1
-                     "** B"  org-level-2
-                     "*** C" org-level-3)))))
+                   '("* A"   beancount-outline-1
+                     "** B"  beancount-outline-2
+                     "*** C" beancount-outline-3)))))
 
 (ert-deftest beancount/account-currency-001 ()
   :tags '(regress)
