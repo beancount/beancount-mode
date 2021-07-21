@@ -1,6 +1,7 @@
 ;;; beancount-test.el --- ERT for beancount-mode -*- lexical-binding: t -*-
 
 ;; Copyright 2019 Daniele Nicolodi <daniele@grinta.net>
+;; Copyright 2019 Alex Smith <aes7mv@virginia.edu>
 
 ;; This file is not part of GNU Emacs.
 
@@ -142,21 +143,71 @@ Return a list of substrings each followed by its face."
   :tags '(indent regress)
   (with-temp-buffer
     (insert "
-2019-01-01 * \"Example\"
+ 2019-01-01 * \"Example\"
+transaction: metadata
   #foo
     ^bar
+      also_transaction: metadata
   Expenses:Example  1.00 USD
-    Assets:Checking           1.00 USD
+            posting: metadata
+also_posting: metadata
+    Assets:Checking          -1.00 USD
+  second_posting: metadata
 ")
     (beancount-mode)
     (forward-line -1)
-    (beancount-indent-transaction)
+    (beancount-indent-directive)
     (should (equal (buffer-string) "
 2019-01-01 * \"Example\"
+  transaction: metadata
   #foo
   ^bar
+  also_transaction: metadata
   Expenses:Example                              1.00 USD
-  Assets:Checking                               1.00 USD
+    posting: metadata
+    also_posting: metadata
+  Assets:Checking                              -1.00 USD
+    second_posting: metadata
+"))))
+
+(ert-deftest beancount/indent-002 ()
+  :tags '(indent regress)
+  (with-temp-buffer
+    (insert "
+   2019-01-01 open Assets:Checking  USD
+
+ 2019-01-01 * \"Example\"
+transaction: metadata
+  #foo
+    ^bar
+      also_transaction: metadata
+  Expenses:Example  1.00 USD
+            posting: metadata
+also_posting: metadata
+    Assets:Checking          -1.00 USD
+  second_posting: metadata
+   2019-01-02 balance Assets:Checking  -1.00 USD
+
+ 2019-01-03 price FOOBAR   123.456 USD
+")
+    (beancount-mode)
+    (indent-region (point-min) (point-max))
+    (should (equal (buffer-string) "
+2019-01-01 open Assets:Checking                      USD
+
+2019-01-01 * \"Example\"
+  transaction: metadata
+  #foo
+  ^bar
+  also_transaction: metadata
+  Expenses:Example                              1.00 USD
+    posting: metadata
+    also_posting: metadata
+  Assets:Checking                              -1.00 USD
+    second_posting: metadata
+2019-01-02 balance Assets:Checking             -1.00 USD
+
+2019-01-03 price FOOBAR                      123.456 USD
 "))))
 
 (ert-deftest beancount/options-001 ()
@@ -196,6 +247,57 @@ known option nmaes."
   Expenses:Test
 "))
     (should (equal beancount-accounts '("Assets:Checking" "Expenses:Test")))))
+
+(ert-deftest beancount-completion-002 ()
+  :tags '(completion regress)
+  (with-temp-buffer
+    (insert "
+2019-01-01 ope Assets:Checking
+")
+    (beancount-mode)
+    (search-backward "p")
+    (completion-at-point)
+    (should (equal (buffer-string) "
+2019-01-01 open Assets:Checking
+"))))
+
+(ert-deftest beancount-completion-003 ()
+  :tags '(completion regress)
+  (with-temp-buffer
+    (insert "
+option \"operating_ \"USD\"
+")
+    (beancount-mode)
+    (search-backward "p")
+    (completion-at-point)
+    (should (equal (buffer-string) "
+option \"operating_currency\" \"USD\"
+"))))
+
+(ert-deftest beancount-completion-004 ()
+  :tags '(completion regress)
+  (with-temp-buffer
+    (insert "
+2019-01-01 * \"Example ^foo-something-link-like-in-string\" ^foo-link/_.etc ^bar-link #foo-tag.more_/cruft #bar-tag
+  Expenses:Test    1.00 USD
+  Assets:Checking
+
+2019-01-01 * \"Example\" ^f #b
+")
+    (beancount-mode)
+    (goto-char (point-max))
+    (search-backward "^f")
+    (completion-at-point)
+    (goto-char (point-max))
+    (search-backward "#b")
+    (completion-at-point)
+    (should (equal (buffer-string) "
+2019-01-01 * \"Example ^foo-something-link-like-in-string\" ^foo-link/_.etc ^bar-link #foo-tag.more_/cruft #bar-tag
+  Expenses:Test    1.00 USD
+  Assets:Checking
+
+2019-01-01 * \"Example\" ^foo-link/_.etc #bar-tag
+"))))
 
 (ert-deftest beancount/outline-001 ()
   :tags '(outline)
@@ -331,5 +433,5 @@ known option nmaes."
   :tags '(regress thing-at-point)
   (with-temp-buffer
     (insert "foo ^link baz")
-    (goto-char 15)
+    (goto-char 5)
     (should (equal (thing-at-point 'beancount-link) "^link"))))

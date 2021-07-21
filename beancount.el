@@ -3,11 +3,13 @@
 ;; Copyright (C) 2013 Martin Blais <blais@furius.ca>
 ;; Copyright (C) 2015 Free Software Foundation, Inc.
 ;; Copyright (C) 2019 Daniele Nicolodi <daniele@grinta.net>
+;; Copyright (C) 2021 Alex Smith <aes7mv@virginia.edu>
 
 ;; Version: 0
 ;; Author: Martin Blais <blais@furius.ca>
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Author: Daniele Nicolodi <daniele@grinta.net>
+;; Author: Alex Smith <aes7mv@virginia.edu>
 
 ;; This file is not part of GNU Emacs.
 
@@ -33,7 +35,9 @@
 (autoload 'ido-completing-read "ido")
 (require 'subr-x)
 (require 'outline)
+(require 'org) ;; for org-level-x faces
 (require 'thingatpt)
+(require 'imenu)
 
 (defgroup beancount ()
   "Editing mode for Beancount files."
@@ -44,10 +48,19 @@
   :type 'integer)
 
 (defcustom beancount-number-alignment-column 52
-  "Column to which align numbers in postinng definitions. Set to
-0 to automatically determine the minimum column that will allow
-to align all amounts."
+  "Column to which align numbers in postings, balance directives,
+and price directives. Set to 0 to automatically determine the
+minimum column that will allow to align all amounts."
   :type 'integer)
+
+(defcustom beancount-alignment-sep-minimum 2
+  "Minimum number of spaces used to separate an aligned number
+from the preceding syntax element."
+  :type 'integer)
+
+(defcustom beancount-tab-dwim-indent-align-numbers nil
+  "If t align numbers when indenting via beancount-tab-dwim."
+  :type 'boolean)
 
 (defcustom beancount-highlight-transaction-at-point nil
   "If t highlight transaction under point."
@@ -176,6 +189,16 @@ from the open directive for the relevant account."
 
 (defconst beancount-tag-chars "[:alnum:]-_/.")
 
+(defvar beancount-tag-char-table (make-char-table 'tag-table)
+  "char-table with non-nil values only for characters allowed in tags")
+(set-char-table-range beancount-tag-char-table (cons ?a  ?z) t)
+(set-char-table-range beancount-tag-char-table (cons ?A  ?Z) t)
+(set-char-table-range beancount-tag-char-table (cons ?0  ?9) t)
+(set-char-table-range beancount-tag-char-table ?- t)
+(set-char-table-range beancount-tag-char-table ?_ t)
+(set-char-table-range beancount-tag-char-table ?/ t)
+(set-char-table-range beancount-tag-char-table ?. t)
+
 (defconst beancount-account-chars "[:alnum:]-_:")
 
 (defconst beancount-option-names
@@ -210,6 +233,9 @@ from the open directive for the relevant account."
 (defconst beancount-date-regexp "[0-9]\\{4\\}[-/][0-9]\\{2\\}[-/][0-9]\\{2\\}"
   "A regular expression to match dates.")
 
+(defconst beancount-timestamp-indent-regexp
+  (concat "\\s-*" beancount-date-regexp))
+
 (defconst beancount-account-regexp
   (concat (regexp-opt beancount-account-categories)
           "\\(?::[[:upper:]][[:alnum:]-_]+\\)+")
@@ -237,15 +263,48 @@ from the open directive for the relevant account."
           "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
           "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
 
+(defconst beancount-balance-regexp
+  (concat "^\\(" beancount-date-regexp "\\) +"
+          "\\(balance\\) +"
+          "\\(" beancount-account-regexp "\\)"
+          "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
+          "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
+
+(defconst beancount-price-regexp
+  (concat "^\\(" beancount-date-regexp "\\) +"
+          "\\(price\\) +"
+          "\\(" beancount-currency-regexp "\\)"
+          "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
+          "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
+
+(defconst beancount-open-regexp
+  (concat "^\\(" beancount-date-regexp "\\) +"
+          "\\(open\\) +"
+          "\\(" beancount-account-regexp "\\)"
+          "\\(?:\\s-+\\(\\(" beancount-currency-regexp "\\)"
+          "\\(?:,\\(" beancount-currency-regexp "\\)\\)*\\)\\)?"))
+
+(defconst beancount-directive-base-regexp
+  (concat "\\(" (regexp-opt beancount-directive-names) "\\) +"))
+
 (defconst beancount-directive-regexp
-  (concat "^\\(" (regexp-opt beancount-directive-names) "\\) +"))
+  (concat "^" beancount-directive-base-regexp))
+
+(defconst beancount-directive-indent-regexp
+  (concat "\\s-*" beancount-directive-base-regexp))
 
 (defconst beancount-timestamped-directive-regexp
   (concat "^\\(" beancount-date-regexp "\\) +"
           "\\(" (regexp-opt beancount-timestamped-directive-names) "\\) +"))
 
+(defconst beancount-metadata-base-regexp
+  "\\([a-z][A-Za-z0-9_-]+:\\)\\s-+\\(.+\\)")
+
 (defconst beancount-metadata-regexp
-  "^\\s-+\\([a-z][A-Za-z0-9_-]+:\\)\\s-+\\(.+\\)")
+  (concat "^\\s-+" beancount-metadata-base-regexp))
+
+(defconst beancount-metadata-indent-regexp
+  (concat "\\s-*" beancount-metadata-base-regexp))
 
 ;; This is a grouping regular expression because the subexpression is
 ;; used in determining the outline level in `beancount-outline-level'.
@@ -300,7 +359,8 @@ from the open directive for the relevant account."
 
 (defun beancount-tab-dwim (&optional arg)
   (interactive "P")
-  (if (and outline-minor-mode
+  (if (and (not (use-region-p))
+           outline-minor-mode
            (or arg (outline-on-heading-p)))
       (beancount-outline-cycle arg)
     (indent-for-tab-command)))
@@ -342,7 +402,7 @@ from the open directive for the relevant account."
   :syntax-table beancount-mode-syntax-table
 
   (setq-local paragraph-ignore-fill-prefix t)
-  (setq-local fill-paragraph-function #'beancount-indent-transaction)
+  (setq-local fill-paragraph-function #'beancount-indent-directive)
 
   (setq-local comment-start ";")
   (setq-local comment-start-skip ";+\\s-*")
@@ -434,6 +494,27 @@ With an argument move to the next non cleared transaction."
   "A list of the accounts available in this buffer.")
 (make-variable-buffer-local 'beancount-accounts)
 
+(defun beancount-inside-string-p ()
+  (nth 3 (syntax-ppss)))
+
+(defun beancount-looking-at-tag-generic (start-char start-char-string)
+  (save-excursion
+    (unless (beancount-inside-string-p)
+      ;; Loop backward until the previous character is not a valid tag
+      ;; character
+      (while (char-table-range beancount-tag-char-table (char-before))
+        (backward-char))
+      ;; Move before the start character if we hit it
+      (when (eq (char-before) start-char)
+        (backward-char))
+      (looking-at (concat start-char-string "[" beancount-tag-chars "]*")))))
+
+(defun beancount-looking-at-tag ()
+  (beancount-looking-at-tag-generic ?# "#"))
+
+(defun beancount-looking-at-link ()
+  (beancount-looking-at-tag-generic ?^ "\\^"))
+
 (defun beancount-completion-at-point ()
   "Return the completion data relevant for the text at point."
   (save-excursion
@@ -441,39 +522,73 @@ With an argument move to the next non cleared transaction."
       (let ((pos (point)))
         (beginning-of-line)
         (cond
-         ;; non timestamped directive
-         ((beancount-looking-at "[a-z]*" 0 pos)
-          (list (match-beginning 0) (match-end 0)
-                (mapcar (lambda (s) (concat s " ")) beancount-directive-names)))
+         ;; non timestamped directive (only match empty lines or lines
+         ;; that begin with something that looks like a
+         ;; non-timestamped directive--don't match the beginning of
+         ;; complete transactions)
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at "\\($\\|[a-z]+\\)" 0 pos))
+          (list (match-beginning 0) (match-end 0) beancount-directive-names))
 
          ;; poptag
-         ((beancount-looking-at
-           (concat "poptag\\s-+\\(\\(?:#[" beancount-tag-chars "]*\\)\\)") 1 pos)
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
+                (concat "poptag\\s-+\\(\\(?:#[" beancount-tag-chars "]*\\)\\)") 1 pos))
           (list (match-beginning 1) (match-end 1)
                 (beancount-collect-pushed-tags (point-min) (point))))
 
          ;; option
          ((beancount-looking-at
-           (concat "^option\\s-+\\(\"[a-z_]*\\)") 1 pos)
+           (concat "^option\\s-+\\(\\(?:\"[a-z_]*\"?\\)?\\)") 1 pos)
           (list (match-beginning 1) (match-end 1)
-                (mapcar (lambda (s) (concat "\"" s "\" ")) beancount-option-names)))
+                (mapcar (lambda (s) (concat "\"" s "\"")) beancount-option-names)))
 
          ;; timestamped directive
-         ((beancount-looking-at
-           (concat beancount-date-regexp "\\s-+\\([[:alpha:]]*\\)") 1 pos)
-          (list (match-beginning 1) (match-end 1)
-                (mapcar (lambda (s) (concat s " ")) beancount-timestamped-directive-names)))
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
+                (concat beancount-date-regexp "\\s-+\\([[:alpha:]]*\\)") 1 pos))
+          (list (match-beginning 1) (match-end 1) beancount-timestamped-directive-names))
 
          ;; timestamped directives followed by account
-         ((beancount-looking-at
-           (concat "^" beancount-date-regexp
-                   "\\s-+" (regexp-opt beancount-account-directive-names)
-                   "\\s-+\\([" beancount-account-chars "]*\\)") 1 pos)
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
+                (concat "^" beancount-date-regexp
+                        "\\s-+" (regexp-opt beancount-account-directive-names)
+                        "\\s-+\\([" beancount-account-chars "]*\\)") 1 pos))
           (setq beancount-accounts nil)
           (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table))
 
+         ;; tags
+         ((save-excursion
+            (goto-char pos)
+            (beancount-looking-at-tag))
+          (let* ((candidates nil)
+                 (regexp (concat "#[" beancount-tag-chars "]+"))
+                 (completion-table
+                  (lambda (string pred action)
+                    (if (null candidates)
+                        (setq candidates
+                              (sort (beancount-collect regexp 0) #'string<)))
+                    (complete-with-action action candidates string pred))))
+            (list (match-beginning 0) (match-end 0) completion-table)))
+
+         ;; links
+         ((save-excursion
+            (goto-char pos)
+            (beancount-looking-at-link))
+          (let* ((candidates nil)
+                 (regexp (concat "\\^[" beancount-tag-chars "]+"))
+                 (completion-table
+                  (lambda (string pred action)
+                    (if (null candidates)
+                        (setq candidates
+                              (sort (beancount-collect regexp 0) #'string<)))
+                    (complete-with-action action candidates string pred))))
+            (list (match-beginning 0) (match-end 0) completion-table)))
+
          ;; posting
-         ((and (beancount-looking-at
+         ((and (not (beancount-inside-string-p))
+               (beancount-looking-at
                 (concat "[ \t]+\\([" beancount-account-chars "]*\\)") 1 pos)
                ;; Do not force the account name to start with a
                ;; capital, so that it is possible to use substring
@@ -481,33 +596,7 @@ With an argument move to the next non cleared transaction."
                ;; capitalization thanks to completion-ignore-case.
                (beancount-inside-transaction-p))
           (setq beancount-accounts nil)
-          (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table))
-
-         ;; tags
-         ((beancount-looking-at
-           (concat "[ \t]+#\\([" beancount-tag-chars "]*\\)") 1 pos)
-          (let* ((candidates nil)
-                 (regexp (concat "\\#\\([" beancount-tag-chars "]+\\)"))
-                 (completion-table
-                  (lambda (string pred action)
-                    (if (null candidates)
-                        (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
-                    (complete-with-action action candidates string pred))))
-            (list (match-beginning 1) (match-end 1) completion-table)))
-
-         ;; links
-         ((beancount-looking-at
-           (concat "[ \t]+\\^\\([" beancount-tag-chars "]*\\)") 1 pos)
-          (let* ((candidates nil)
-                 (regexp (concat "\\^\\([" beancount-tag-chars "]+\\)"))
-                 (completion-table
-                  (lambda (string pred action)
-                    (if (null candidates)
-                        (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
-                    (complete-with-action action candidates string pred))))
-            (list (match-beginning 1) (match-end 1) completion-table))))))))
+          (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table)))))))
 
 (defun beancount-collect (regexp n)
   "Return an unique list of REGEXP group N in the current buffer."
@@ -518,9 +607,12 @@ With an argument move to the next non cleared transaction."
           (goto-char (point-min))
           (while (re-search-forward regexp nil t)
             ;; Ignore matches around `pos' (the point position when
-            ;; entering this funcyion) since that's presumably what
+            ;; entering this function) since that's presumably what
             ;; we're currently trying to complete.
-            (unless (<= (match-beginning 0) pos (match-end 0))
+            ;; Also ignore matches inside strings (Consider: allow
+            ;; caller to specify this behavior).
+            (unless (or (<= (match-beginning 0) pos (match-end 0))
+                        (beancount-inside-string-p))
               (puthash (match-string-no-properties n) nil hash)))
           (hash-table-keys hash))))))
 
@@ -561,8 +653,25 @@ will allow to align all numbers."
   (save-excursion
     (beginning-of-line)
     (cond
-     ;; Only timestamped directives start with a digit.
-     ((looking-at-p "[0-9]") 0)
+     ;; Lines which begin with a timestamp or a non-timestamped
+     ;; directive get indented to the beginning of the line.
+     ;; Consider: use "\\s-*[0-9]" instead of full timestamp regexp
+     ((or (looking-at-p beancount-timestamp-indent-regexp)
+          (looking-at-p beancount-directive-indent-regexp))
+      0)
+     ;; Metadata lines should have an additional level of indentation
+     ;; if the previous line is a directive (timestamped or not) or a
+     ;; posting. Otherwise they should have the same level of
+     ;; indentation as the previous line.
+     ((looking-at-p beancount-metadata-indent-regexp)
+      (if (/= (forward-line -1) 0)
+          0
+        (if (or (looking-at-p beancount-transaction-regexp)
+                (looking-at-p beancount-directive-regexp)
+                (looking-at-p beancount-timestamped-directive-regexp)
+                (looking-at-p beancount-posting-regexp))
+            (+ (current-indentation) beancount-transaction-indent)
+          (current-indentation))))
      ;; Otherwise look at the previous line.
      ((and (= (forward-line -1) 0)
            (or (looking-at-p "[ \t].+")
@@ -575,18 +684,55 @@ will allow to align all numbers."
 (defun beancount-align-number (target-column)
   (save-excursion
     (beginning-of-line)
-    ;; Check if the current line is a posting with a number to align.
-    (when (and (looking-at beancount-posting-regexp)
-               (match-string 2))
-      (let* ((account-end-column (- (match-end 1) (line-beginning-position)))
-             (number-width (- (match-end 3) (match-beginning 3)))
-             (account-end (match-end 1))
-             (number-beginning (match-beginning 3))
-             (spaces (max 2 (- target-column account-end-column number-width))))
-        (unless (eq spaces (- number-beginning account-end))
-          (goto-char account-end)
-          (delete-region account-end number-beginning)
-          (insert (make-string spaces ? )))))))
+    (let (prev-end number-beginning number-width)
+      (cond
+       ;; Grab bounds if this is a posting
+       ((and (looking-at beancount-posting-regexp)
+             (match-string 2))
+        (setq prev-end (match-end 1)
+              number-beginning (match-beginning 3)
+              number-width (- (match-end 3) (match-beginning 3))))
+       ;; Grab bounds if this is a balance directive
+       ((and (looking-at beancount-balance-regexp)
+             (match-string 4))
+        (setq prev-end (match-end 3)
+              number-beginning (match-beginning 5)
+              number-width (- (match-end 5) (match-beginning 5))))
+       ;; Grab bounds if this is a price directive
+       ((and (looking-at beancount-price-regexp)
+             (match-string 4))
+        (setq prev-end (match-end 3)
+              number-beginning (match-beginning 5)
+              number-width (- (match-end 5) (match-beginning 5)))))
+      ;; Align the number if we got its bounds above
+      (when number-beginning
+        (let* ((prev-end-column (- prev-end (line-beginning-position)))
+               (spaces (max beancount-alignment-sep-minimum
+                            (- target-column prev-end-column number-width))))
+          (unless (eq spaces (- number-beginning prev-end))
+            (goto-char prev-end)
+            (delete-region prev-end number-beginning)
+            (insert (make-string spaces ? ))))))))
+
+(defun beancount-align-currency (target-column)
+  (save-excursion
+    (beginning-of-line)
+    (let (prev-end currency-beginning)
+      (cond
+       ;; Grab the bounds if this is an open directive
+       ((and (looking-at beancount-open-regexp)
+             (match-string 5))
+        (setq prev-end (match-end 3)
+              currency-beginning (match-beginning 5))))
+      ;; Align the currency if we got its bounds above
+      (when currency-beginning
+        (let* ((prev-end-column (- prev-end (line-beginning-position)))
+               (spaces (max beancount-alignment-sep-minimum
+                        (- target-column prev-end-column))))
+          (unless (eq spaces (- currency-beginning prev-end))
+            (goto-char prev-end)
+            (delete-region prev-end currency-beginning)
+            (insert (make-string spaces ? ))))))))
 
 (defun beancount-indent-line ()
   (let ((indent (beancount-compute-indentation))
@@ -594,8 +740,10 @@ will allow to align all numbers."
     (unless (eq indent (current-indentation))
       (if savep (save-excursion (indent-line-to indent))
         (indent-line-to indent)))
-    (unless (eq this-command 'beancount-tab-dwim)
-      (beancount-align-number (beancount-number-alignment-column)))))
+    (unless (and (eq this-command 'beancount-tab-dwim)
+                 (not beancount-tab-dwim-indent-align-numbers))
+      (beancount-align-number (beancount-number-alignment-column))
+      (beancount-align-currency (+ (beancount-number-alignment-column) 1)))))
 
 (defun beancount-indent-region (start end)
   "Indent a region automagically. START and END specify the region to indent."
@@ -610,6 +758,48 @@ will allow to align all numbers."
           (beancount-indent-line))
         (forward-line 1))
       (move-marker end nil))))
+
+(defun beancount-goto-directive-begin ()
+  "Move the cursor to the first line of the directive definition."
+  (interactive)
+  (beginning-of-line)
+  ;; Loop backwards until we see a timestamped directive, a
+  ;; non-timestamped directive, or we hit the beginning of the file
+  (while (and (not (or (looking-at-p beancount-timestamp-indent-regexp)
+                       (looking-at-p beancount-directive-indent-regexp)))
+              (eq (forward-line -1) 0)))
+  (point))
+
+(defun beancount-goto-directive-end ()
+  "Move the cursor to the line after the directive definition."
+  (interactive)
+  (beginning-of-line)
+  ;; If we start at the beginning of a directive, skip to the next
+  ;; line
+  (when (or (looking-at-p beancount-timestamp-indent-regexp)
+            (looking-at-p beancount-directive-indent-regexp))
+    (forward-line))
+  ;; Loop forwards until we see a whitespace-only line, timestamped
+  ;; directive, a non-timestamped directive, or we hit the end of the
+  ;; file
+  (while (and (not (or (looking-at-p "\\s-*$")
+                       (looking-at-p beancount-timestamp-indent-regexp)
+                       (looking-at-p beancount-directive-indent-regexp)))
+              (eq (forward-line) 0)))
+  (point))
+
+(defun beancount-find-directive-extents (p)
+  (save-excursion
+    (goto-char p)
+    (list (beancount-goto-directive-begin)
+          (beancount-goto-directive-end))))
+
+(defun beancount-indent-directive (&optional _justify _region)
+  "Indent Beancount directive at point."
+  (interactive)
+  (save-excursion
+    (let ((bounds (beancount-find-directive-extents (point))))
+      (beancount-indent-region (car bounds) (cadr bounds)))))
 
 (defun beancount-indent-transaction (&optional _justify _region)
   "Indent Beancount transaction at point."
@@ -877,10 +1067,7 @@ Only useful if you have not installed Beancount properly in your PATH.")
                     (number-to-string (line-number-at-pos)))))
 
 (defun beancount--bounds-of-link-at-point ()
-  ;; There is no length limit for links but it seems reasonable to
-  ;; limit the search for the link to the 128 characters before and
-  ;; after the point. This number is chosen arbitrarily.
-  (when (thing-at-point-looking-at (concat "\\^[" beancount-tag-chars "]+") 128)
+  (when (beancount-looking-at-link)
     (cons (match-beginning 0) (match-end 0))))
 
 (put 'beancount-link 'bounds-of-thing-at-point #'beancount--bounds-of-link-at-point)
