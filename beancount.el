@@ -34,6 +34,7 @@
 (require 'subr-x)
 (require 'outline)
 (require 'thingatpt)
+(require 'cl-lib)
 
 (defgroup beancount ()
   "Editing mode for Beancount files."
@@ -253,7 +254,7 @@ from the open directive for the relevant account."
 
 (defun beancount-outline-level ()
   (let ((len (- (match-end 1) (match-beginning 1))))
-    (if (equal (substring (match-string 1) 0 1) ";")
+    (if (string-equal (substring (match-string 1) 0 1) ";")
         (- len 2)
       len)))
 
@@ -288,7 +289,7 @@ from the open directive for the relevant account."
     (,beancount-timestamped-directive-regexp (1 'beancount-date)
                                              (2 'beancount-directive))
     ;; Fontify section headers when composed with outline-minor-mode.
-    (,(concat "^\\(" beancount-outline-regexp "\\).*") . (0 (beancount-outline-face)))
+    (,(concat "^\\(" beancount-outline-regexp "\\).*") (0 (beancount-outline-face)))
     ;; Tags and links.
     (,(concat "\\#[" beancount-tag-chars "]*") . 'beancount-tag)
     (,(concat "\\^[" beancount-tag-chars "]*") . 'beancount-link)
