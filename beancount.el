@@ -66,80 +66,80 @@ from the open directive for the relevant account."
 (defgroup beancount-faces nil "Beancount mode highlighting" :group 'beancount)
 
 (defface beancount-directive
-  `((t :inherit font-lock-keyword-face))
+  '((t :inherit font-lock-keyword-face))
   "Face for Beancount directives.")
 
 (defface beancount-tag
-  `((t :inherit font-lock-type-face))
+  '((t :inherit font-lock-type-face))
   "Face for Beancount tags.")
 
 (defface beancount-link
-  `((t :inherit font-lock-type-face))
+  '((t :inherit font-lock-type-face))
   "Face for Beancount links.")
 
 (defface beancount-date
-  `((t :inherit font-lock-constant-face))
+  '((t :inherit font-lock-constant-face))
   "Face for Beancount dates.")
 
 (defface beancount-account
-  `((t :inherit font-lock-builtin-face))
+  '((t :inherit font-lock-builtin-face))
   "Face for Beancount account names.")
 
 (defface beancount-amount
-  `((t :inherit font-lock-default-face))
+  '((t :inherit font-lock-default-face))
   "Face for Beancount amounts.")
 
 (defface beancount-narrative
-  `((t :inherit font-lock-builtin-face))
+  '((t :inherit font-lock-builtin-face))
   "Face for Beancount transactions narrative.")
 
 (defface beancount-narrative-cleared
-  `((t :inherit font-lock-string-face))
+  '((t :inherit font-lock-string-face))
   "Face for Beancount cleared transactions narrative.")
 
 (defface beancount-narrative-pending
-  `((t :inherit font-lock-keyword-face))
+  '((t :inherit font-lock-keyword-face))
   "Face for Beancount pending transactions narrative.")
 
 (defface beancount-metadata
-  `((t :inherit font-lock-type-face))
+  '((t :inherit font-lock-type-face))
   "Face for Beancount metadata.")
 
 (defface beancount-highlight
-  `((t :inherit highlight))
+  '((t :inherit highlight))
   "Face to highlight Beancount transaction at point.")
 
 (defface beancount-outline-1
-  `((t :inherit outline-1))
-  "First level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-1))
+  "Outline level 1.")
 
 (defface beancount-outline-2
-  `((t :inherit outline-2))
-  "Second level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-2))
+  "Outline level 2.")
 
 (defface beancount-outline-3
-  `((t :inherit outline-3))
-  "Third level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-3))
+  "Outline level 3.")
 
 (defface beancount-outline-4
-  `((t :inherit outline-4))
-  "Fourth level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-4))
+  "Outline level 4.")
 
 (defface beancount-outline-5
-  `((t :inherit outline-5))
-  "Fifth level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-5))
+  "Outline level 5.")
 
 (defface beancount-outline-6
-  `((t :inherit outline-6))
-  "Sixth level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-6))
+  "Outline level 6.")
 
 (defface beancount-outline-7
-  `((t :inherit outline-7))
-  "Seventh level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-7))
+  "Outline level 7.")
 
 (defface beancount-outline-8
-  `((t :inherit outline-8))
-  "Eighth level of `outline-minor-mode' headings in `beancount-mode'.")
+  '((t :inherit outline-8))
+  "Outline level 8.")
 
 (defconst beancount-account-directive-names
   '("balance"
