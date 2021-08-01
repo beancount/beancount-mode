@@ -287,6 +287,7 @@ from the open directive for the relevant account."
     (define-key map (vconcat p [(k)]) #'beancount-linked)
     (define-key map (vconcat p [(r)]) #'beancount-region-default)
     (define-key map (vconcat p [(t)]) #'beancount-region-value)
+    (define-key map (vconcat p [(y)]) #'beancount-region-cost)
     (define-key map (vconcat p [(p)]) #'beancount-insert-prices)
     (define-key map (vconcat p [(\;)]) #'beancount-align-to-previous-number)
     (define-key map (vconcat p [(\:)]) #'beancount-align-numbers)
@@ -866,18 +867,22 @@ Only useful if you have not installed Beancount properly in your PATH.")
                         buffer-file-name
                         (or link lnarg))))))
 
-(defun beancount-region (rmin rmax &optional command)
+(defun beancount-region (rmin rmax &optional command &rest args)
   "Get the info from \"region\" from `beancount-doctor-program'."
   (when (use-region-p)
-    (let ((compilation-read-command nil)
-          (region-command (or command "region")))
-      (beancount--run beancount-doctor-program region-command
-                      buffer-file-name
-                      (format "%d:%d"
-                              (line-number-at-pos rmin)
-                              (line-number-at-pos
-                               (if (= 0 (save-excursion (goto-char rmax) (current-column)))
-                                   (1- rmax) rmax)))))))
+    (let* ((compilation-read-command nil)
+           (region-command (or command "region"))
+           (args (append (list beancount-doctor-program
+                               region-command
+                               buffer-file-name)
+                         args
+                         (list (format "%d:%d"
+                                       (line-number-at-pos rmin)
+                                       (line-number-at-pos
+                                        (if (= 0 (save-excursion (goto-char rmax) (current-column)))
+                                            (1- rmax) rmax)))))))
+      ;(message args)))
+      (apply #'beancount--run args))))
 
 (defun beancount-region-default (rmin rmax)
   (interactive "r")
@@ -885,7 +890,11 @@ Only useful if you have not installed Beancount properly in your PATH.")
 
 (defun beancount-region-value (rmin rmax)
   (interactive "r")
-  (beancount-region rmin rmax "region_value"))
+  (beancount-region rmin rmax "region" "--conversion=value"))
+
+(defun beancount-region-cost (rmin rmax)
+  (interactive "r")
+  (beancount-region rmin rmax "region" "--conversion=cost"))
 
 (defvar beancount-price-program "bean-price"
   "Program to run the price fetching commands.")
