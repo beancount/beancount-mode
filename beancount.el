@@ -815,11 +815,18 @@ what that column is and returns it (an integer)."
 	      (goto-char pos)
               (insert " " currency))))))))
 
-(defun beancount-insert-date ()
-  "Start a new timestamped directive."
-  (interactive)
+(defun beancount-insert-date (&optional days)
+  "Start a new timestamped directive with date shifted by DAYS from today."
+  (interactive "P")
   (unless (bolp) (newline))
-  (insert (format-time-string "%Y-%m-%d") " "))
+  (insert (beancount--shift-current-date days) " "))
+
+(defun beancount--shift-current-date (days)
+  "Return ISO-8601 formatted date shifted by DAYS from today."
+  (let ((days-to-shift (or days 0)))
+    (format-time-string
+     "%Y-%m-%d"
+     (time-add (current-time) (days-to-time days-to-shift)))))
 
 (defvar beancount-install-dir nil
   "Directory in which Beancount's source is located.
