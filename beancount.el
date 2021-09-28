@@ -238,6 +238,14 @@ from the open directive for the relevant account."
           "\\(?:\\s-+\\(\\(" beancount-number-regexp "\\)"
           "\\s-+\\(" beancount-currency-regexp "\\)\\)\\)?"))
 
+(defconst beancount-balance-regexp
+  ;; The grouping in this regular expression matches the one in
+  ;; `beancount-posting-regexp' to be used in amount align
+  ;; machinery. See `beancount-align-number'.
+  (concat "^" beancount-date-regexp "\\s-+balance\\s-+"
+          "\\(" beancount-account-regexp "\\)\\s-+"
+          "\\(\\(" beancount-number-regexp "\\)\\s-+\\(" beancount-currency-regexp "\\)\\)"))
+
 (defconst beancount-directive-regexp
   (concat "^\\(" (regexp-opt beancount-directive-names) "\\) +"))
 
@@ -578,8 +586,9 @@ will allow to align all numbers."
   (save-excursion
     (beginning-of-line)
     ;; Check if the current line is a posting with a number to align.
-    (when (and (looking-at beancount-posting-regexp)
-               (match-string 2))
+    (when (and (or (looking-at beancount-posting-regexp)
+                   (looking-at beancount-balance-regexp))
+                   (match-string 2))
       (let* ((account-end-column (- (match-end 1) (line-beginning-position)))
              (number-width (- (match-end 3) (match-beginning 3)))
              (account-end (match-end 1))
