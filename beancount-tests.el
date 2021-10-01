@@ -17,6 +17,7 @@
 
 (require 'ert)
 (require 'beancount)
+(require 'imenu)
 
 (ert-deftest beancount/smoke-001 ()
   :tags '(regress)
@@ -129,6 +130,15 @@ Return a list of substrings each followed by its face."
      "1.00 USD"         beancount-amount
      "Assets:Checking"  beancount-account)))
 
+(ert-deftest beancount/fontify-005 ()
+  :tags '(font regress)
+  (beancount-test-font-lock "
+2019-01-01 open Assets:TD:TDB900 TDB900
+"
+   '("2019-01-01"       beancount-date
+     "open"             beancount-directive
+     "Assets:TD:TDB900" beancount-account)))
+
 (ert-deftest beancount/indent-001 ()
   :tags '(indent regress)
   (with-temp-buffer
@@ -230,9 +240,9 @@ known option nmaes."
            (font-lock-ensure)
            (buffer-string))))
     (should (equal (beancount-test-face-groups fontified)
-                   '("* A"   org-level-1
-                     "** B"  org-level-2
-                     "*** C" org-level-3)))))
+                   '("* A"   beancount-outline-1
+                     "** B"  beancount-outline-2
+                     "*** C" beancount-outline-3)))))
 
 (ert-deftest beancount/account-currency-001 ()
   :tags '(regress)
@@ -322,5 +332,5 @@ known option nmaes."
   :tags '(regress thing-at-point)
   (with-temp-buffer
     (insert "foo ^link baz")
-    (goto-char 15)
+    (goto-char 7)
     (should (equal (thing-at-point 'beancount-link) "^link"))))
