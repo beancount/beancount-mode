@@ -850,6 +850,15 @@ Only useful if you have not installed Beancount properly in your PATH.")
 (define-thing-chars beancount-link beancount-link-chars)
 (define-thing-chars beancount-tag beancount-link-chars)
 
+;; (defun beancount--bounds-of-link-at-point ()
+;;   ;; There is no length limit for links but it seems reasonable to
+;;   ;; limit the search for the link to the 128 characters before and
+;;   ;; after the point. This number is chosen arbitrarily.
+;;   (when (thing-at-point-looking-at (concat "\\^[" beancount-tag-chars "]+") 128)
+;;     (cons (match-beginning 0) (match-end 0))))
+;;
+;; (put 'beancount-link 'bounds-of-thing-at-point #'beancount--bounds-of-link-at-point)
+
 (defun beancount-linked ()
   "Get the \"linked\" info from `beancount-doctor-program'."
   (interactive)
@@ -1058,6 +1067,30 @@ Essentially a much simplified version of `next-line'."
   (while (and (not (eobp))
               (get-char-property (1- (point)) 'invisible))
     (beginning-of-line 2)))
+
+;;; Fava
+
+(defvar beancount--fava-process nil)
+
+(defun beancount-fava ()
+  "Start (and open) or stop the fava server."
+  (interactive)
+  (if beancount--fava-process
+      (progn
+        (delete-process beancount--fava-process)
+        (setq beancount--fava-process nil)
+        (message "Fava process killed"))
+    (setq beancount--fava-process
+          (start-process "fava" (get-buffer-create "*fava*") "fava"
+                         (if (eq 'beancount-mode major-mode) (buffer-file-name)
+                           (read-file-name "File to load: "))))
+    (set-process-filter beancount--fava-process #'beancount--fava-filter)
+    (message "Fava process started")))
+
+(defun beancount--fava-filter (process output)
+  "Open fava url as soon as the address is announced."
+  (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
+      (browse-url (match-string 1 output))))
 
 (provide 'beancount)
 ;;; beancount.el ends here

@@ -303,3 +303,24 @@ known option nmaes."
                              ("2020" . 113)
                              ("2020 January" . 120)
                              ("2020 February" . 136)))))))
+
+(ert-deftest beancount/link-at-point-001 ()
+  :tags '(regress thing-at-point)
+  (with-temp-buffer
+    (insert "^link")
+    (beancount-mode)
+    (goto-char 2)
+    (should (equal (thing-at-point 'beancount-link) "^link"))))
+
+(ert-deftest beancount/link-at-point-002 ()
+  :tags '(regress thing-at-point)
+  (with-temp-buffer
+    (insert "not-a-link")
+    (should (equal (thing-at-point 'beancount-link) nil))))
+
+(ert-deftest beancount/link-at-point-003 ()
+  :tags '(regress thing-at-point)
+  (with-temp-buffer
+    (insert "foo ^link baz")
+    (goto-char 15)
+    (should (equal (thing-at-point 'beancount-link) "^link"))))
