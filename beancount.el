@@ -47,7 +47,7 @@
 (defcustom beancount-number-alignment-column 52
   "Column to which align numbers in postinng definitions. Set to
 0 to automatically determine the minimum column that will allow
-to align all amounts."
+to align all amounts. Set to nil to disable number alignment."
   :type 'integer)
 
 (defcustom beancount-highlight-transaction-at-point nil
@@ -551,7 +551,7 @@ With an argument move to the next non cleared transaction."
 Returns `beancount-number-alignment-column' unless it is 0. In
 that case, scan the buffer to determine the minimum column that
 will allow to align all numbers."
-  (if (> beancount-number-alignment-column 0)
+  (unless (eq beancount-number-alignment-column 0)
       beancount-number-alignment-column
     (save-excursion
       (save-match-data
@@ -605,7 +605,8 @@ will allow to align all numbers."
     (unless (eq indent (current-indentation))
       (if savep (save-excursion (indent-line-to indent))
         (indent-line-to indent)))
-    (beancount-align-number (beancount-number-alignment-column))))
+    (if beancount-number-alignment-column
+      (beancount-align-number (beancount-number-alignment-column)))))
 
 (defun beancount-indent-region (start end)
   "Indent a region automagically. START and END specify the region to indent."
