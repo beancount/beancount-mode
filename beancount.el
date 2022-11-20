@@ -45,7 +45,7 @@
   :type 'integer)
 
 (defcustom beancount-number-alignment-column 52
-  "Column to which align numbers in postinng definitions. Set to
+  "Column to which align numbers in posting definitions. Set to
 0 to automatically determine the minimum column that will allow
 to align all amounts."
   :type 'integer)
