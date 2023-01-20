@@ -425,6 +425,20 @@ With an argument move to the next non cleared transaction."
         (setq done t)))
     (if (not done) (goto-char (point-max)))))
 
+(defun beancount-goto-previous-transaction (&optional arg)
+  "Move to the previous transaction.
+With an argument move to the previous non cleared transaction."
+  (interactive "P")
+  (beancount-goto-transaction-begin)
+  (let ((done nil))
+    (while (and (not done)
+                (re-search-backward beancount-transaction-regexp nil t))
+      (if (and arg (string-equal (match-string 2) "*"))
+          (goto-char (match-beginning 0))
+        (goto-char (match-beginning 0))
+        (setq done t)))
+    (if (not done) (goto-char (point-min)))))
+
 (defun beancount-find-transaction-extents (p)
   (save-excursion
     (goto-char p)
