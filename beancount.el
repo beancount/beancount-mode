@@ -344,7 +344,7 @@ from the open directive for the relevant account."
     st))
 
 ;;;###autoload
-(define-derived-mode beancount-mode fundamental-mode "Beancount"
+(define-derived-mode beancount-mode prog-mode "Beancount"
   "A mode for Beancount files.
 
 \\{beancount-mode-map}"
