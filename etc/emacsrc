@@ -79,3 +79,23 @@
                     sql)))
 
 (define-key* beancount-mode-map [(control c)(j)] #'beancount-query-journal-at-point)
+
+
+;; TODO: Refine this a bit later on.
+(defvar beancount-balance-command
+  (concat
+   "select account, sum(position) "
+   "where account ~ '%s' "
+   "group by 1 "
+   "order by 1"))
+
+(defun beancount-query-balance-at-point ()
+  "Run a balance command for the account at point."
+  (interactive)
+  (let* ((account (thing-at-point 'beancount-account))
+         (sql (concat "\"" (format beancount-balance-command account) "\"")))
+    (beancount--run beancount-query-program
+                    (file-relative-name buffer-file-name)
+                    sql)))
+
+(define-key* beancount-mode-map [(control c)(shift j)] #'beancount-query-balance-at-point)
