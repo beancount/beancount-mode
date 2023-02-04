@@ -344,7 +344,7 @@ from the open directive for the relevant account."
     st))
 
 ;;;###autoload
-(define-derived-mode beancount-mode fundamental-mode "Beancount"
+(define-derived-mode beancount-mode prog-mode "Beancount"
   "A mode for Beancount files.
 
 \\{beancount-mode-map}"
@@ -424,6 +424,20 @@ With an argument move to the next non cleared transaction."
         (goto-char (match-beginning 0))
         (setq done t)))
     (if (not done) (goto-char (point-max)))))
+
+(defun beancount-goto-previous-transaction (&optional arg)
+  "Move to the previous transaction.
+With an argument move to the previous non cleared transaction."
+  (interactive "P")
+  (beancount-goto-transaction-begin)
+  (let ((done nil))
+    (while (and (not done)
+                (re-search-backward beancount-transaction-regexp nil t))
+      (if (and arg (string-equal (match-string 2) "*"))
+          (goto-char (match-beginning 0))
+        (goto-char (match-beginning 0))
+        (setq done t)))
+    (if (not done) (goto-char (point-min)))))
 
 (defun beancount-find-transaction-extents (p)
   (save-excursion
