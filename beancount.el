@@ -519,6 +519,15 @@ With an argument move to the previous non cleared transaction."
           (setq beancount-accounts nil)
           (list (match-beginning 1) (match-end 1) #'beancount-account-completion-table))
 
+         ;; pad directive followed by two accounts
+         ((beancount-looking-at
+           (concat "^" beancount-date-regexp
+                   "\\s-+" (regexp-opt '("pad"))
+                   "\\s-+\\([" beancount-account-chars "]*\\)"
+                   "\\s-+\\([" beancount-account-chars "]*\\)") 2 pos)
+          (setq beancount-accounts nil)
+          (list (match-beginning 2) (match-end 2) #'beancount-account-completion-table))
+
          ;; posting
          ((and (beancount-looking-at
                 (concat "[ \t]+\\([" beancount-account-chars "]*\\)") 1 pos)
