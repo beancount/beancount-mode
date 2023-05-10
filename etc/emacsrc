@@ -46,6 +46,24 @@
 (define-key* beancount-mode-map [(control c)(control p)] #'outline-previous-visible-heading)
 (define-key* beancount-mode-map [(control c)(control u)] #'outline-up-heading)
 
+;; Restore old-style keybindings.
+;; 
+;; If you prefer the old (pre-issue-#1) keybindings, you could
+;; uncomment some or all of the lines below to selectively restore them.
+;; Note that those old bindings don't respect Emacs conventions (see
+;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html)
+;; which is why they were changed in mid-2023.
+;; 
+;; (define-key beancount-mode-map [(control c)(control g)] #'beancount-transaction-clear)
+;; (define-key beancount-mode-map [(control c)(l)] #'beancount-check)
+;; (define-key beancount-mode-map [(control c)(q)] #'beancount-query)
+;; (define-key beancount-mode-map [(control c)(x)] #'beancount-context)
+;; (define-key beancount-mode-map [(control c)(k)] #'beancount-linked)
+;; (define-key beancount-mode-map [(control c)(r)] #'beancount-region-default)
+;; (define-key beancount-mode-map [(control c)(t)] #'beancount-region-value)
+;; (define-key beancount-mode-map [(control c)(y)] #'beancount-region-cost)
+;; (define-key beancount-mode-map [(control c)(p)] #'beancount-insert-prices)
+
 ;; Disable auto-indent.
 
 (defun disable-electric-indent ()
