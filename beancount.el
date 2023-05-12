@@ -838,14 +838,14 @@ what that column is and returns it (an integer)."
               (insert " " currency))))))))
 
 (defun beancount-insert-date (&optional days)
-  "Start a new timestamped directive with date shifted by DAYS from today."
+  "Start a new timestamped directive with date DAYS before today."
   (interactive "P")
   (unless (bolp) (newline))
   (insert (beancount--shift-current-date days) " "))
 
 (defun beancount--shift-current-date (days)
-  "Return ISO-8601 formatted date shifted by DAYS from today."
-  (let ((days-to-shift (or days 0)))
+  "Return ISO-8601 formatted date DAYS before today."
+  (let ((days-to-shift (- (or days 0))))
     (format-time-string
      "%Y-%m-%d"
      (time-add (current-time) (days-to-time days-to-shift)))))
