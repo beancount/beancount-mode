@@ -78,6 +78,13 @@ Alternatively the keybindings for =outline-minor-mode= can be globally
 remapped. Please refer to the =outline-minor-mode= documentation in
 the Emacs manual for more details.
 
+You can enable on-the-fly checks on your ledger file using =bean-check= via
+flymake:
+
+#+begin_src elisp
+  (add-hook 'beancount-mode-hook #'flymake-bean-check-enable)
+#+end_src
+
 The =etc/emacsrc= file contains some example configuration for
 =beancount-mode= and some experiments that may find their way into the
 main codebase.
