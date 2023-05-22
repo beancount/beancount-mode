@@ -55,12 +55,17 @@
 
 ;;;###autoload
 (defun flymake-bean-check-enable ()
+  "Enable checking via flymake."
   (interactive nil beancount-mode)
   (when (buffer-file-name)
     (flymake-mode t)
     (add-hook 'flymake-diagnostic-functions 'flymake-bean-check--run nil t)))
 
 (defun flymake-bean-check--run (report-fn &rest _ignored)
+  "Perform checking.
+
+This function should be added to `flymake-diagnostic-functions'
+in the enabled buffer. REPORT-FN is a function."
   (unless (executable-find flymake-bean-check-executable)
     (error "The executable %s doesn't exist. See `flymake-bean-check-executable'"
            flymake-bean-check-executable))
