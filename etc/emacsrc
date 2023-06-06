@@ -46,13 +46,12 @@
 (define-key* beancount-mode-map [(control c)(control p)] #'outline-previous-visible-heading)
 (define-key* beancount-mode-map [(control c)(control u)] #'outline-up-heading)
 
-;; Restore old-style keybindings.
+;; Selectively restore old-style keybindings.
 ;; 
-;; If you prefer the old (pre-issue-#1) keybindings, you could
-;; uncomment some or all of the lines below to selectively restore them.
-;; Note that those old bindings don't respect Emacs conventions (see
-;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html)
-;; which is why they were changed in mid-2023.
+;; If you want all the old (pre-issue-#1) keybindings, then set
+;; `beancount-mode-old-style-keybindings' in your Emacs configuration
+;; to restore them en masse.  Or, to restore just certain bindings,
+;; uncomment selected lines below:
 ;; 
 ;; (define-key beancount-mode-map [(control c)(control g)] #'beancount-transaction-clear)
 ;; (define-key beancount-mode-map [(control c)(l)] #'beancount-check)

@@ -88,3 +88,15 @@ flymake:
 The =etc/emacsrc= file contains some example configuration for
 =beancount-mode= and some experiments that may find their way into the
 main codebase.
+
+* Keybinding compatibility
+
+In mid-2023 the default keybindings for many commands in
+=beancount-mode= were changed to become compliant with the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html][Emacs
+keybinding conventions]].  However, if you are accustomed to the old
+keybindings and would prefer to continue using them, just put this
+into your Emacs configuration before =beancount.el= is loaded:
+
+#+begin_src elisp
+(setq beancount-mode-old-style-keybindings t)
+#+end_src

@@ -317,6 +317,19 @@ from the open directive for the relevant account."
 (defvar beancount-mode-map-prefix [(control c)]
   "The prefix key used to bind Beancount commands in Emacs")
 
+(defvar beancount-mode-old-style-keybindings nil
+  "*Set this to non-nil to continue using old-style keybindings.
+
+In mid-2023, `beancount-mode' changed the keybindings for many of its
+commands.  This was because the old bindings violated the Emacs
+keybinding standards (see section \"Key Binding Conventions\" in the
+Emacs Lisp documentation).  However, you might be accustomed to the
+old bindings and prefer to continue using them; this variable offers a
+convenient way to do so.  If it is non-nil when `beancount.el' is
+loaded, then the old bindings will also be made available.  (The new
+bindings will be left in place too, since the key sequences they use
+are reserved for the mode anyway.)")
+
 (defvar beancount-mode-map
   (let ((map (make-sparse-keymap))
         (p beancount-mode-map-prefix))
@@ -334,6 +347,16 @@ from the open directive for the relevant account."
     (define-key map (vconcat p [(control i)]) #'beancount-insert-prices)
     (define-key map (vconcat p [(\;)]) #'beancount-align-to-previous-number)
     (define-key map (vconcat p [(\:)]) #'beancount-align-numbers)
+    (when beancount-mode-old-style-keybindings
+      (define-key map [(control c)(control g)] #'beancount-transaction-clear)
+      (define-key map [(control c)(l)] #'beancount-check)
+      (define-key map [(control c)(q)] #'beancount-query)
+      (define-key map [(control c)(x)] #'beancount-context)
+      (define-key map [(control c)(k)] #'beancount-linked)
+      (define-key map [(control c)(r)] #'beancount-region-default)
+      (define-key map [(control c)(t)] #'beancount-region-value)
+      (define-key map [(control c)(y)] #'beancount-region-cost)
+      (define-key map [(control c)(p)] #'beancount-insert-prices))
     map))
 
 (defvar beancount-mode-syntax-table
