@@ -573,10 +573,13 @@ With an argument move to the previous non cleared transaction."
 
 (defun beancount-account-completion-table (string pred action)
   (if (eq action 'metadata) '(metadata (category . beancount-account))
-    (if (null beancount-accounts)
-        (setq beancount-accounts
-              (sort (beancount-collect beancount-account-regexp 0) #'string<)))
-    (complete-with-action action beancount-accounts string pred)))
+    (with-current-buffer (let ((win (minibuffer-selected-window)))
+                           (if (window-live-p win) (window-buffer win)
+                             (current-buffer)))
+      (if (null beancount-accounts)
+          (setq beancount-accounts
+		(sort (beancount-collect beancount-account-regexp 0) #'string<)))
+      (complete-with-action action beancount-accounts string pred))))
 
 ;; Default to substring completion for beancount accounts.
 (defconst beancount--completion-overrides
