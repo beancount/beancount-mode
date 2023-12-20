@@ -53,6 +53,12 @@
 
 (defvar-local flymake-bean-check-process nil)
 
+(defun flymake-bean-check-cache-filename (file)
+  "Create the bean-check cache file name for FILE."
+  (let* ((backup-directory-alist (list (cons ".*" temporary-file-directory)))
+	 (name (make-backup-file-name-1 file)))
+    (concat name ".~flymake-bean-check~")))
+
 ;;;###autoload
 (defun flymake-bean-check-enable ()
   "Enable checking via flymake."
@@ -72,15 +78,17 @@ in the enabled buffer. REPORT-FN is a function."
   (when (and flymake-bean-check-process
              (process-live-p flymake-bean-check-process))
     (kill-process flymake-bean-check-process))
-  (let ((source (current-buffer))
-        (buffer (generate-new-buffer "*flymake-bean-check*")))
+  (let* ((source (current-buffer))
+         (buffer (generate-new-buffer "*flymake-bean-check*"))
+         (cache-file (flymake-bean-check-cache-filename (buffer-file-name))))
     (setq flymake-bean-check-process
           (make-process :buffer buffer
                         :name "flymake-bean-check"
                         :noquery t
                         :connection-type 'pipe
                         :command (list flymake-bean-check-executable
-                                       (expand-file-name (buffer-file-name)))
+                                       "/dev/stdin"
+                                       "--cache-filename" cache-file)
                         :sentinel
                         (lambda (proc _event)
                           (when (memq (process-status proc) '(exit signal))
@@ -99,7 +107,9 @@ in the enabled buffer. REPORT-FN is a function."
                                                                        :error message)
                                               result)))
                                     (funcall report-fn (nreverse result))))
-                              (kill-buffer buffer))))))))
+                              (kill-buffer buffer))))))
+    (process-send-region flymake-bean-check-process (point-min) (point-max))
+    (process-send-eof flymake-bean-check-process)))
 
 (provide 'flymake-bean-check)
 ;;; flymake-bean-check.el ends here
