@@ -213,7 +213,7 @@ from the open directive for the relevant account."
 
 (defconst beancount-account-regexp
   (concat (regexp-opt beancount-account-categories)
-          "\\(?::[[:upper:]][[:alnum:]-_]+\\)+")
+          "\\(?::[[:upper:][:digit:]][[:alnum:]-_]+\\)+")
   "A regular expression to match account names.")
 
 (defconst beancount-number-regexp "[-+]?[0-9]+\\(?:,[0-9]\\{3\\}\\)*\\(?:\\.[0-9]*\\)?"
