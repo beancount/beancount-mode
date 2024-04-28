@@ -87,7 +87,7 @@ from the open directive for the relevant account."
   "Face for Beancount account names.")
 
 (defface beancount-amount
-  '((t :inherit font-lock-default-face))
+  '((t :inherit font-lock-number-face))
   "Face for Beancount amounts.")
 
 (defface beancount-narrative
@@ -367,7 +367,7 @@ are reserved for the mode anyway.)")
     st))
 
 ;;;###autoload
-(define-derived-mode beancount-mode prog-mode "Beancount"
+(define-derived-mode beancount-mode text-mode "Beancount"
   "A mode for Beancount files.
 
 \\{beancount-mode-map}"
