@@ -10,7 +10,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        emacs: ['26.1', '26.2', '26.3', '27.1', '27.2', '28.1', '28.2']
+        emacs:
+          - '26.1'
+          - '26.2'
+          - '26.3'
+          - '27.1'
+          - '27.2'
+          - '28.1'
+          - '28.2'
+          - '29.1'
+          - '29.2'
+          - '29.3'
     steps:
     - uses: purcell/setup-emacs@master
       with:
