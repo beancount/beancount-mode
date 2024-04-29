@@ -87,7 +87,7 @@ from the open directive for the relevant account."
   "Face for Beancount account names.")
 
 (defface beancount-amount
-  '((t :inherit font-lock-default-face))
+  '((t :inherit default))
   "Face for Beancount amounts.")
 
 (defface beancount-narrative
