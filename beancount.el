@@ -345,6 +345,8 @@ are reserved for the mode anyway.)")
     (define-key map (vconcat p [(control t)]) #'beancount-region-value)
     (define-key map (vconcat p [(control y)]) #'beancount-region-cost)
     (define-key map (vconcat p [(control i)]) #'beancount-insert-prices)
+    (define-key map (vconcat p [(left)]) #'beancount-date-down-day)
+    (define-key map (vconcat p [(right)]) #'beancount-date-up-day)
     (define-key map (vconcat p [(\;)]) #'beancount-align-to-previous-number)
     (define-key map (vconcat p [(\:)]) #'beancount-align-numbers)
     (when beancount-mode-old-style-keybindings
@@ -872,18 +874,56 @@ what that column is and returns it (an integer)."
 	      (goto-char pos)
               (insert " " currency))))))))
 
+(defmacro beancount--encode-time (time)
+  "Compatibility helper.
+Impedence match the `encode-time' interface between Emacs-26 and
+later Emacs releases. It can be eliminated once support for
+Emacs-26 is dropped."
+  (if (version< emacs-version "27.1")
+      `(apply #'encode-time ,time)
+    `(encode-time ,time)))
+
+(defun beancount--parse-date (string)
+  "Parse the STRING date in the format %Y-%m-%d into a Lisp timestamp."
+  (save-match-data
+    (string-match "\\`\\([0-9][0-9][0-9][0-9]\\)-\\([0-9][0-9]\\)-\\([0-9][0-9]\\)\\'" string)
+    (beancount--encode-time (list 0 0 0
+                                  (string-to-number (match-string 3 string))
+                                  (string-to-number (match-string 2 string))
+                                  (string-to-number (match-string 1 string))
+                                  nil -1 nil))))
+
+(defun beancount--format-date (time)
+  "Format the Lisp timestamp TIME into a date in the format %Y-%m-%d."
+  (format-time-string "%Y-%m-%d" time))
+
 (defun beancount-insert-date (&optional days)
   "Start a new timestamped directive with date DAYS before today."
   (interactive "P")
   (unless (bolp) (newline))
-  (insert (beancount--shift-current-date days) " "))
+  (insert (beancount--format-date (time-add (current-time) (days-to-time (- (or days 0)))))))
 
-(defun beancount--shift-current-date (days)
-  "Return ISO-8601 formatted date DAYS before today."
-  (let ((days-to-shift (- (or days 0))))
-    (format-time-string
-     "%Y-%m-%d"
-     (time-add (current-time) (days-to-time days-to-shift)))))
+(defun beancount--shift-date-at-point (days)
+  "Shift the date under point by a specified number of DAYS."
+    (if (thing-at-point-looking-at beancount-date-regexp 10)
+        (let ((pos (point))
+              (date (beancount--parse-date (match-string 0))))
+          (replace-match (beancount--format-date (time-add date (days-to-time days))) t t)
+          ;; Ensure that point stays in the same position.
+          (goto-char pos))
+    (user-error "No date at point")))
+
+(defun beancount-date-up-day (&optional days)
+  "Increase the date in the current line by one day.
+With prefix ARG, change that many days."
+  (interactive "p" beancount-mode)
+  (beancount--shift-date-at-point (or days 1)))
+
+(defun beancount-date-down-day (&optional days)
+  "Decrease the date in the current line by one day.
+With prefix ARG, change that many days."
+  (interactive "p" beancount-mode)
+  (beancount--shift-date-at-point (- (or days 1))))
 
 (defvar beancount-install-dir nil
   "Directory in which Beancount's source is located.
