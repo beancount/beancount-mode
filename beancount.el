@@ -36,6 +36,9 @@
 (require 'thingatpt)
 (require 'cl-lib)
 
+;;;###autoload
+(add-to-list 'auto-mode-alist '("\\.beancount\\'" . beancount-mode))
+
 (defgroup beancount ()
   "Editing mode for Beancount files."
   :group 'beancount)
