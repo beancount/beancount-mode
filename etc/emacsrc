@@ -70,14 +70,6 @@
 ;; alignment column to be determined from file content.  Postings in
 ;; transactions are indented with `beancount-transaction-indent` spaces.
 
-(defadvice shell-quote-argument (around dont-quote-already-quoted-args activate)
-  "Avoid quoting argument if it's already quoted."
-  (let ((arg (ad-get-arg 0)))
-    (setq ad-return-value
-          (if (or (string-match "\".*\"$" arg)
-                  (string-match "\'.*\'$" arg))
-              arg ad-do-it))))
-
 (defvar beancount-journal-command
   (concat
    "select date, flag, maxwidth(description, 80), position, balance "
@@ -86,11 +78,10 @@
 (defun beancount-query-journal-at-point ()
   "Run a journal command for the account at point."
   (interactive)
-  (let* ((account (thing-at-point 'beancount-account))
-         (sql (concat "\"" (format beancount-journal-command account) "\"")))
+  (let ((account (thing-at-point 'beancount-account)))
     (beancount--run beancount-query-program
                     (file-relative-name buffer-file-name)
-                    sql)))
+                    (format beancount-journal-command account))))
 
 (define-key* beancount-mode-map [(control c)(j)] #'beancount-query-journal-at-point)
 
@@ -106,10 +97,9 @@
 (defun beancount-query-balance-at-point ()
   "Run a balance command for the account at point."
   (interactive)
-  (let* ((account (thing-at-point 'beancount-account))
-         (sql (concat "\"" (format beancount-balance-command account) "\"")))
+  (let ((account (thing-at-point 'beancount-account)))
     (beancount--run beancount-query-program
                     (file-relative-name buffer-file-name)
-                    sql)))
+                    (format beancount-balance-command account))))
 
 (define-key* beancount-mode-map [(control c)(shift j)] #'beancount-query-balance-at-point)
