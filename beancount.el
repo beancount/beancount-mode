@@ -35,6 +35,8 @@
 (require 'outline)
 (require 'thingatpt)
 (require 'cl-lib)
+(require 'xref)
+(require 'apropos)
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.beancount\\'" . beancount-mode))
@@ -259,6 +261,11 @@ from the open directive for the relevant account."
 (defconst beancount-metadata-regexp
   "^\\s-+\\([a-z][A-Za-z0-9_-]+:\\)\\s-+\\(.+\\)")
 
+(defconst beancount-open-directive-regexp
+  (concat "^\\(" beancount-date-regexp "\\) +"
+          "\\(open\\) +"
+          "\\(" beancount-account-regexp "\\)"))
+
 ;; This is a grouping regular expression because the subexpression is
 ;; used in determining the outline level in `beancount-outline-level'.
 (defvar beancount-outline-regexp "\\(;;;+\\|\\*+\\)")
@@ -402,6 +409,7 @@ are reserved for the mode anyway.)")
 
   (setq-local outline-regexp beancount-outline-regexp)
   (setq-local outline-level #'beancount-outline-level)
+  (setq-local xref-backend-functions #'beancount-xref-backend)
 
   (setq imenu-generic-expression
 	(list (list nil (concat "^" beancount-outline-regexp "\\s-+\\(.*\\)$") 2))))
@@ -1247,6 +1255,66 @@ Essentially a much simplified version of `next-line'."
   "Open fava url as soon as the address is announced."
   (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
       (browse-url (match-string 1 output))))
+
+;;; Xref backend
+
+(defun beancount-xref-backend ()
+  "Beancount Xref backend."
+  'beancount)
+
+(cl-defmethod xref-backend-definitions ((_ (eql beancount)) identifier)
+  "Find definitions of IDENTIFIER."
+  (let ((buf (current-buffer)))
+    (cl-loop
+     for (def-id . def-pos) in
+     (beancount-collect-pos-alist beancount-open-directive-regexp 3)
+     if (equal def-id identifier)
+     collect
+     (xref-make def-id (xref-make-buffer-location buf def-pos)))))
+
+(cl-defmethod xref-backend-references ((_ (eql beancount)) identifier)
+  "Find references of IDENTIFIER."
+  (let ((fname (buffer-file-name)))
+    (cl-loop
+     for (ref-id . ref-pos) in
+     (beancount-collect-pos-alist beancount-account-regexp 0)
+     if (equal ref-id identifier)
+     collect
+     (xref-make ref-id
+                (xref-make-file-location
+                 fname (line-number-at-pos ref-pos) 0)))))
+
+;; NOTE: This is a backport from Emacs 27 and newer versions. Can be
+;; removed once beancount-mode no longer supports Emacs 26.
+(defun beancount-xref-apropos-regexp (pattern)
+  "Return an Emacs regexp from PATTERN similar to `apropos'."
+  (apropos-parse-pattern
+   (if (string-equal (regexp-quote pattern) pattern)
+       ;; Split into words
+       (or (split-string pattern "[ \t]+" t)
+           (user-error "No word list given"))
+     pattern)))
+
+(cl-defmethod xref-backend-apropos ((_ (eql beancount)) pattern)
+  "Find all symbols that match PATTERN string."
+  (let ((pattern-re (beancount-xref-apropos-regexp pattern))
+        (fname (buffer-file-name)))
+    (cl-loop
+     for (ref-id . ref-pos) in
+     (beancount-collect-pos-alist beancount-account-regexp 0)
+     if (string-match-p pattern-re ref-id)
+     collect
+     (xref-make ref-id
+                (xref-make-file-location
+                 fname (line-number-at-pos ref-pos) 0)))))
+
+(cl-defmethod xref-backend-identifier-completion-table ((_ (eql beancount)))
+  (beancount-get-account-names))
+
+(cl-defmethod xref-backend-identifier-at-point ((_ (eql beancount)))
+  "Extract a symbol at point, check if it is an account, return it"
+  (when-let ((acc (thing-at-point 'beancount-account)))
+    (substring-no-properties acc)))
 
 (provide 'beancount)
 ;;; beancount.el ends here
