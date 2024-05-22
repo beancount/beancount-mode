@@ -333,18 +333,20 @@ known option nmaes."
     (goto-char 7)
     (should (equal (thing-at-point 'beancount-link) "^link"))))
 
+;;; Date shifting
+
 (ert-deftest beancount/date-shift-up-day ()
-    :tags '(date-shift)
-    (with-temp-buffer
-      (insert "2024-05-11\n")
-      (goto-char 0)
-      (beancount-date-up-day)
-      (should (equal (thing-at-point 'line) "2024-05-12\n"))))
+  :tags '(date-shift)
+  (with-temp-buffer
+    (insert "2024-05-11\n")
+    (goto-char 0)
+    (beancount-date-up-day)
+    (should (equal (thing-at-point 'line) "2024-05-12\n"))))
 
 (ert-deftest beancount/date-shift-down-day ()
-    :tags '(date-shift)
-    (with-temp-buffer
-      (insert "2024-05-11\n")
-      (goto-char 0)
-      (beancount-date-down-day)
-      (should (equal (thing-at-point 'line) "2024-05-10\n"))))
+  :tags '(date-shift)
+  (with-temp-buffer
+    (insert "2024-05-11\n")
+    (goto-char 0)
+    (beancount-date-down-day)
+    (should (equal (thing-at-point 'line) "2024-05-10\n"))))
