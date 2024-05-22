@@ -16,6 +16,7 @@
 
 
 (require 'ert)
+(require 'eieio)
 (require 'beancount)
 (require 'imenu)
 
@@ -350,3 +351,100 @@ known option nmaes."
     (goto-char 0)
     (beancount-date-down-day)
     (should (equal (thing-at-point 'line) "2024-05-10\n"))))
+
+;;; Xref backend
+
+(defun beancount-test-xref-definition-pos (identifier position)
+  "Check if IDENTIFIER's position is the same is the same as
+POSITION provided by Beancount's xref-backend-definitions lookup."
+  (let ((defs (xref-backend-definitions 'beancount identifier)))
+    (should (equal (length defs) 1))
+    (let* ((def (car (xref-backend-definitions 'beancount identifier)))
+           (loc (xref-item-location def))
+           ;; Pre Emacs-28.1, defclass was used for
+           ;; xref-buffer-location.
+           (pos (if (version< emacs-version "28.1")
+                    (oref loc position)
+                  (xref-buffer-location-position loc))))
+      (should (equal pos position)))))
+
+(ert-deftest beancount/xref-backend-definitions ()
+  :tags '(xref)
+  (with-temp-buffer
+    (insert "
+2019-01-01 open Assets:Account1 TDB900
+2019-01-01 open Assets:Account2 TDB900
+2019-01-01 open Assets:Account3 TDB900
+
+2019-01-10  * \"Opening Balances\"
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+")
+    (beancount-test-xref-definition-pos "Assets:Account1" 2)
+    (beancount-test-xref-definition-pos "Assets:Account2" 41)
+    (beancount-test-xref-definition-pos "Assets:Account3" 80)))
+
+(defmacro beancount-with-temp-file (&rest body)
+  "Generate a temporary file and open it as a current buffer.
+Run BODY forms in the buffer's context. Remove both the buffer
+and a backing file having completed the test."
+  (declare (indent 1))
+  `(let ((file (make-temp-file "beancount-test-"))
+        buf)
+    (unwind-protect
+        (progn (setq buf (find-file-literally file))
+               ,@body)
+      (ignore-errors (delete-file file))
+      (ignore-errors
+        (with-current-buffer buf
+          (set-buffer-modified-p nil))
+        (kill-buffer buf)))))
+
+(ert-deftest beancount/xref-backend-references ()
+  :tags '(xref)
+  ;; Creating Xref file locations assumes a buffer backed by a file.
+  (beancount-with-temp-file
+      (insert "
+2019-01-01 open Assets:Account1 TDB900
+2019-01-01 open Assets:Account2 TDB900
+2019-01-01 open Assets:Account3 TDB900
+
+2019-01-10  * \"Opening Balances\"
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+  Assets:Account2        2.00 TDB900
+
+2019-01-10  * \"More Balances\"
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+")
+    (should (equal (length (xref-backend-references 'beancount "Assets:Account1")) 3))
+    (should (equal (length (xref-backend-references 'beancount "Assets:Account2")) 2))
+    (should (equal (length (xref-backend-references 'beancount "Assets:Account3")) 1))))
+
+(ert-deftest beancount/xref-backend-apropos ()
+  :tags '(xref)
+  ;; Creating Xref file locations assumes a buffer backed by a file.
+  (beancount-with-temp-file
+      (insert "
+2019-01-01 open Assets:Account1 TDB900
+2019-01-01 open Assets:Account2 TDB900
+2019-01-01 open Assets:Account3 TDB900
+
+2019-01-10  * \"Opening Balances\"
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+  Assets:Account2        2.00 TDB900
+
+2019-01-10  * \"More Balances\"
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+")
+    (should (equal (length (xref-backend-apropos 'beancount "Assets")) 6))
+    (should (equal (length (xref-backend-apropos 'beancount "Assets Account")) 6))
+    (should (equal (length (xref-backend-apropos 'beancount "Assets Account1")) 3))
+    (should (equal (length (xref-backend-apropos 'beancount "Equity")) 2))
+    (should (equal (length (xref-backend-apropos 'beancount "Opening")) 2))
+    (should (equal (length (xref-backend-apropos 'beancount "Opening Assets")) 0))))
