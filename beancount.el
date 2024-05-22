@@ -570,30 +570,43 @@ With an argument move to the previous non cleared transaction."
                     (complete-with-action action candidates string pred))))
             (list (match-beginning 1) (match-end 1) completion-table))))))))
 
-(defun beancount-collect (regexp n)
-  "Return an unique list of REGEXP group N in the current buffer."
+(defun beancount-collect-pos-alist (regexp n)
+  "Return a list of conses mapping matches of REGEXP group N in the
+current buffer to a position of the match beginning."
   (let ((pos (point)))
     (save-excursion
       (save-match-data
-        (let ((hash (make-hash-table :test 'equal)))
+        (let (result)
           (goto-char (point-min))
           (while (re-search-forward regexp nil t)
             ;; Ignore matches around `pos' (the point position when
             ;; entering this funcyion) since that's presumably what
             ;; we're currently trying to complete.
             (unless (<= (match-beginning 0) pos (match-end 0))
-              (puthash (match-string-no-properties n) nil hash)))
-          (hash-table-keys hash))))))
+              (push (cons (match-string-no-properties n) (match-beginning 0))
+                    result)))
+          (nreverse result))))))
+
+(defun beancount-get-account-names ()
+  "Return a list of known account names available in the buffer."
+  (when (null beancount-accounts)
+    ;; Collecting a full list and then deduping it is a heavy
+    ;; operation. But because of caching the will only happen once -
+    ;; whenever a completion is requested.
+    (setq beancount-accounts
+	  (sort (beancount-collect-unique beancount-account-regexp 0) #'string<)))
+  beancount-accounts)
+
+(defun beancount-collect-unique (regexp n)
+  "Return an unique list of REGEXP group N in the current buffer."
+  (delete-dups (mapcar #'car (beancount-collect-pos-alist regexp n))))
 
 (defun beancount-account-completion-table (string pred action)
   (if (eq action 'metadata) '(metadata (category . beancount-account))
     (with-current-buffer (let ((win (minibuffer-selected-window)))
                            (if (window-live-p win) (window-buffer win)
                              (current-buffer)))
-      (if (null beancount-accounts)
-          (setq beancount-accounts
-		(sort (beancount-collect beancount-account-regexp 0) #'string<)))
-      (complete-with-action action beancount-accounts string pred))))
+      (complete-with-action action (beancount-get-account-names) string pred))))
 
 ;; Default to substring completion for beancount accounts.
 (defconst beancount--completion-overrides
@@ -703,7 +716,7 @@ Uses ido niceness according to `beancount-use-ido'."
         ;; completion tables thus directly build a list of the
         ;; accounts in the buffer
         (let ((beancount-accounts
-               (sort (beancount-collect beancount-account-regexp 0) #'string<)))
+               (sort (beancount-collect-unique beancount-account-regexp 0) #'string<)))
           (ido-completing-read "Account: " beancount-accounts
                                nil nil (thing-at-point 'word)))
       (completing-read "Account: " #'beancount-account-completion-table
