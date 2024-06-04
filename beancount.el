@@ -561,7 +561,7 @@ With an argument move to the previous non cleared transaction."
                   (lambda (string pred action)
                     (if (null candidates)
                         (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
+                              (sort (beancount-collect-unique regexp 1) #'string<)))
                     (complete-with-action action candidates string pred))))
             (list (match-beginning 1) (match-end 1) completion-table)))
 
@@ -574,7 +574,7 @@ With an argument move to the previous non cleared transaction."
                   (lambda (string pred action)
                     (if (null candidates)
                         (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
+                              (sort (beancount-collect-unique regexp 1) #'string<)))
                     (complete-with-action action candidates string pred))))
             (list (match-beginning 1) (match-end 1) completion-table))))))))
 
