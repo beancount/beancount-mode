@@ -412,7 +412,11 @@ are reserved for the mode anyway.)")
   (setq-local xref-backend-functions #'beancount-xref-backend)
 
   (setq imenu-generic-expression
-	(list (list nil (concat "^" beancount-outline-regexp "\\s-+\\(.*\\)$") 2))))
+	(list (list nil (concat "^" beancount-outline-regexp "\\s-+\\(.*\\)$") 2)))
+
+  ;; Used when limiting visibility with links and tags. Text with the
+  ;; beancount spec in the properties will be invisible.
+  (add-to-invisibility-spec '(beancount . t)))
 
 (defun beancount-collect-pushed-tags (begin end)
   "Return list of all pushed (and not popped) tags in the region."
@@ -1255,6 +1259,74 @@ Essentially a much simplified version of `next-line'."
   "Open fava url as soon as the address is announced."
   (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
       (browse-url (match-string 1 output))))
+
+
+;;; Filtering transactions by tags/links.
+;;
+;;
+;; Invisibility introduced similar to how outline-minor-mode works -
+;; through overlays and invisibility specs (see
+;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Invisible-Text.html)
+
+(defmacro beancount-foreach-transaction (&rest body)
+  "Iterate over transactions.
+
+Evaluate BODY for every transaction with point set to transaction
+beginning."
+  (declare (indent 0) (debug t))
+  `(save-excursion
+     (goto-char (point-min))
+     (unless (beancount-inside-transaction-p)
+       (beancount-goto-next-transaction))
+     (while (beancount-inside-transaction-p)
+       ,@body
+       (beancount-goto-next-transaction))))
+
+(defun beancount-show (target)
+  "Only show transactions marked with a TARGET (a link or a tag)."
+  (interactive
+   (list (completing-read
+          "Filter by tag/link:"
+          (beancount-collect-unique beancount-tag-or-link-regexp 0))))
+  (beancount--hide-region (point-min) (point-max))
+  (beancount-foreach-transaction
+    (when (beancount--current-line-rematch-p (regexp-quote target))
+      (beancount--show-current-transaction))))
+(defun beancount--hide-region (beg end)
+  "Hide a region between BEG and END by putting an overlay over it."
+  (remove-overlays beg end 'invisible 'beancount)
+
+  (let ((o (make-overlay beg end nil 'front-advance)))
+    ;; Delete the overlay once it has a zero length.
+    (overlay-put o 'evaporate t)
+    ;; Add a property to the overlay that will make the text under the
+    ;; overlay invisibile.
+    (overlay-put o 'invisible 'beancount)))
+
+(defun beancount-show-all ()
+  "Remove all effects of tag/link filtering."
+  (interactive)
+  (beancount--show-region (point-min) (point-max)))
+
+(defun beancount--show-region (beg end)
+  "Make a region between BEG and END visible."
+  (remove-overlays beg end 'invisible 'beancount))
+
+(defun beancount--show-current-transaction ()
+  "Unhide the transaction at point."
+  (when (beancount-inside-transaction-p)
+    (let* ((extents (beancount-find-transaction-extents (point)))
+           (beg (car extents))
+           (end (cadr extents)))
+      ; decrementing BEG to also show a newline precending the current
+      ; transaction
+      (beancount--show-region (1- beg) end))))
+
+(defun beancount--current-line-rematch-p (regex)
+  "Check if the current line contains a REGEX match."
+  (save-excursion
+    (goto-char (line-beginning-position))
+    (re-search-forward regex (line-end-position) t)))
 
 ;;; Xref backend
 
