@@ -940,13 +940,13 @@ Emacs-26 is dropped."
 (defun beancount-date-up-day (&optional days)
   "Increase the date in the current line by one day.
 With prefix ARG, change that many days."
-  (interactive "p" beancount-mode)
+  (interactive "p")
   (beancount--shift-date-at-point (or days 1)))
 
 (defun beancount-date-down-day (&optional days)
   "Decrease the date in the current line by one day.
 With prefix ARG, change that many days."
-  (interactive "p" beancount-mode)
+  (interactive "p")
   (beancount--shift-date-at-point (- (or days 1))))
 
 (defvar beancount-install-dir nil
