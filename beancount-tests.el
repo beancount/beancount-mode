@@ -448,3 +448,96 @@ and a backing file having completed the test."
     (should (equal (length (xref-backend-apropos 'beancount "Equity")) 2))
     (should (equal (length (xref-backend-apropos 'beancount "Opening")) 2))
     (should (equal (length (xref-backend-apropos 'beancount "Opening Assets")) 0))))
+
+;;; Filtering transactions
+
+(ert-deftest beancount/with-foreach-transaction ()
+  :tags '(filtering)
+  (with-temp-buffer
+    (insert "
+2019-01-01 open Assets:Account1 TDB900
+2019-01-01 open Assets:Account2 TDB900
+2019-01-01 open Assets:Account3 TDB900
+
+2019-01-10  * \"Transaction 1\"
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+2019-01-10  * \"Transaction 2\"
+  Equity:Opening-Balances
+  Assets:Account2        1.00 TDB900
+
+2019-01-10  * \"Transaction 3\"
+  Equity:Opening-Balances
+  Assets:Account3        1.00 TDB900
+
+")
+    ;; Make sure we found every transaction defined in the file
+    (let ((count 0))
+      (beancount-foreach-transaction
+          (setq count (1+ count)))
+      (should (equal count 3)))))
+
+(ert-deftest beancount/tag-show ()
+  :tags '(filtering)
+  (with-temp-buffer
+    (insert "
+2019-01-01 open Assets:Account1 TDB900
+2019-01-01 open Assets:Account3 TDB900
+
+2019-01-10  * \"Transaction 1\" #tag
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+2019-01-10  * \"Transaction 2\" #other-tag
+  Equity:Opening-Balances
+  Assets:Account2        1.00 TDB900
+
+2019-01-10  * \"Transaction 3\"
+  Equity:Opening-Balances
+  Assets:Account3        1.00 TDB900
+
+2019-01-10  * \"Transaction 4\" #tag
+  Equity:Opening-Balances
+  Assets:Account3        1.00 TDB900
+
+")
+    ;; Only tagged transactions should be visible
+    (let ((count 0))
+      (beancount-show "#tag")
+      (beancount-foreach-transaction
+          (unless (invisible-p (point))
+            (setq count (1+ count))))
+      (should (equal count 2)))))
+
+(ert-deftest beancount/link-show ()
+  :tags '(filtering)
+  (with-temp-buffer
+    (insert "
+2019-01-01 open Assets:Account1 TDB900
+2019-01-01 open Assets:Account3 TDB900
+
+2019-01-10  * \"Transaction 1\" ^link
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+2019-01-10  * \"Transaction 2\" ^link
+  Equity:Opening-Balances
+  Assets:Account2        1.00 TDB900
+
+2019-01-10  * \"Transaction 3\" ^link
+  Equity:Opening-Balances
+  Assets:Account3        1.00 TDB900
+
+2019-01-10  * \"Transaction 4\"
+  Equity:Opening-Balances
+  Assets:Account3        1.00 TDB900
+
+")
+    ;; Only linked transactions should be visible
+    (let ((count 0))
+      (beancount-show "^link")
+      (beancount-foreach-transaction
+        (unless (invisible-p (point))
+          (setq count (1+ count))))
+      (should (equal count 3)))))
