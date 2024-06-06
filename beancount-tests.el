@@ -363,7 +363,7 @@ POSITION provided by Beancount's xref-backend-definitions lookup."
            (loc (xref-item-location def))
            ;; Pre Emacs-28.1, defclass was used for
            ;; xref-buffer-location.
-           (pos (if (version< emacs-version "28.1")
+           (pos (if (< emacs-major-version 28)
                     (oref loc position)
                   (xref-buffer-location-position loc))))
       (should (equal pos position)))))
