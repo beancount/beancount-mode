@@ -37,6 +37,7 @@
 (require 'cl-lib)
 (require 'xref)
 (require 'apropos)
+(require 'rx)
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.beancount\\'" . beancount-mode))
@@ -269,6 +270,12 @@ from the open directive for the relevant account."
 ;; This is a grouping regular expression because the subexpression is
 ;; used in determining the outline level in `beancount-outline-level'.
 (defvar beancount-outline-regexp "\\(;;;+\\|\\*+\\)")
+
+;; Regular expression for all symbols recognised by the Xref backend.
+(defconst beancount-xref-symbol-regexp
+  (rx-to-string `(or (regexp ,beancount-account-regexp)
+                     (regexp ,(concat "#[" beancount-tag-chars "]+"))
+                     (regexp ,(concat "\\^[" beancount-tag-chars "]+")))))
 
 (defun beancount-outline-level ()
   (let ((len (- (match-end 1) (match-beginning 1))))
@@ -1021,6 +1028,12 @@ Only useful if you have not installed Beancount properly in your PATH.")
 
 (put 'beancount-link 'bounds-of-thing-at-point #'beancount--bounds-of-link-at-point)
 
+(defun beancount--bounds-of-tag-at-point ()
+  (when (thing-at-point-looking-at (concat "\\#[" beancount-tag-chars "]+") 128)
+    (cons (match-beginning 0) (match-end 0))))
+
+(put 'beancount-tag 'bounds-of-thing-at-point #'beancount--bounds-of-tag-at-point)
+
 (defun beancount-linked ()
   "Get the \"linked\" info from `beancount-doctor-program'."
   (interactive)
@@ -1264,20 +1277,45 @@ Essentially a much simplified version of `next-line'."
 
 (cl-defmethod xref-backend-definitions ((_ (eql beancount)) identifier)
   "Find definitions of IDENTIFIER."
-  (let ((buf (current-buffer)))
+  (let ((buf (current-buffer))
+        re mgroup)
+    (cond
+     ;; tag
+     ((string-prefix-p "#" identifier)
+      (setq re (concat "#[" beancount-tag-chars "]+"))
+      (setq mgroup 0))
+     ;; link
+     ((string-prefix-p "^" identifier)
+      (setq re (concat "\\^[" beancount-tag-chars "]+"))
+      (setq mgroup 0))
+     ;; account
+     (t
+      (setq re beancount-open-directive-regexp)
+      (setq mgroup 3)))
     (cl-loop
-     for (def-id . def-pos) in
-     (beancount-collect-pos-alist beancount-open-directive-regexp 3)
-     if (equal def-id identifier)
-     collect
-     (xref-make def-id (xref-make-buffer-location buf def-pos)))))
+       for (def-id . def-pos) in
+       (beancount-collect-pos-alist re mgroup)
+       if (equal def-id identifier)
+       collect
+       (xref-make def-id (xref-make-buffer-location buf def-pos)))))
 
 (cl-defmethod xref-backend-references ((_ (eql beancount)) identifier)
   "Find references of IDENTIFIER."
-  (let ((fname (buffer-file-name)))
+  (let ((fname (buffer-file-name))
+        re)
+    (setq re
+          (cond
+           ;; tag
+           ((string-prefix-p "#" identifier)
+            (concat "#[" beancount-tag-chars "]+"))
+           ;; link
+           ((string-prefix-p "^" identifier)
+            (concat "\\^[" beancount-tag-chars "]+"))
+           ;; account
+           (t beancount-account-regexp)))
     (cl-loop
      for (ref-id . ref-pos) in
-     (beancount-collect-pos-alist beancount-account-regexp 0)
+     (beancount-collect-pos-alist re 0)
      if (equal ref-id identifier)
      collect
      (xref-make ref-id
@@ -1301,7 +1339,7 @@ Essentially a much simplified version of `next-line'."
         (fname (buffer-file-name)))
     (cl-loop
      for (ref-id . ref-pos) in
-     (beancount-collect-pos-alist beancount-account-regexp 0)
+     (beancount-collect-pos-alist beancount-xref-symbol-regexp 0)
      if (string-match-p pattern-re ref-id)
      collect
      (xref-make ref-id
@@ -1309,12 +1347,14 @@ Essentially a much simplified version of `next-line'."
                  fname (line-number-at-pos ref-pos) 0)))))
 
 (cl-defmethod xref-backend-identifier-completion-table ((_ (eql beancount)))
-  (beancount-get-account-names))
+  (beancount-collect-unique beancount-xref-symbol-regexp 0))
 
 (cl-defmethod xref-backend-identifier-at-point ((_ (eql beancount)))
   "Extract a symbol at point, check if it is an account, return it"
-  (when-let ((acc (thing-at-point 'beancount-account)))
-    (substring-no-properties acc)))
+  (when-let ((thing (or (thing-at-point 'beancount-account)
+                        (thing-at-point 'beancount-link)
+                        (thing-at-point 'beancount-tag))))
+    (substring-no-properties thing)))
 
 (provide 'beancount)
 ;;; beancount.el ends here

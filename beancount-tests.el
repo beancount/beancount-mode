@@ -368,7 +368,7 @@ POSITION provided by Beancount's xref-backend-definitions lookup."
                   (xref-buffer-location-position loc))))
       (should (equal pos position)))))
 
-(ert-deftest beancount/xref-backend-definitions ()
+(ert-deftest beancount/xref-backend-definitions-accounts ()
   :tags '(xref)
   (with-temp-buffer
     (insert "
@@ -384,23 +384,54 @@ POSITION provided by Beancount's xref-backend-definitions lookup."
     (beancount-test-xref-definition-pos "Assets:Account2" 41)
     (beancount-test-xref-definition-pos "Assets:Account3" 80)))
 
+(ert-deftest beancount/xref-backend-definitions-tags ()
+  :tags '(xref)
+  (with-temp-buffer
+    (insert "
+2019-01-10  * \"Opening Balances\" #tag1
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+2019-01-10  * \"Opening Balances\" #tag2
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+")
+    (beancount-test-xref-definition-pos "#tag1" 35)
+    (beancount-test-xref-definition-pos "#tag2" 138)))
+
+(ert-deftest beancount/xref-backend-definitions-links ()
+  :tags '(xref)
+  (with-temp-buffer
+    (insert "
+2019-01-10  * \"Opening Balances\" #link1
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+2019-01-10  * \"Opening Balances\" #link2
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+")
+    (beancount-test-xref-definition-pos "#link1" 35)
+    (beancount-test-xref-definition-pos "#link2" 139)))
+
+
 (defmacro beancount-with-temp-file (&rest body)
   "Generate a temporary file and open it as a current buffer.
 Run BODY forms in the buffer's context. Remove both the buffer
 and a backing file having completed the test."
   (declare (indent 1))
   `(let ((file (make-temp-file "beancount-test-"))
-        buf)
-    (unwind-protect
-        (progn (setq buf (find-file-literally file))
-               ,@body)
-      (ignore-errors (delete-file file))
-      (ignore-errors
-        (with-current-buffer buf
-          (set-buffer-modified-p nil))
-        (kill-buffer buf)))))
+         buf)
+     (unwind-protect
+         (progn (setq buf (find-file-literally file))
+                ,@body)
+       (ignore-errors (delete-file file))
+       (ignore-errors
+         (with-current-buffer buf
+           (set-buffer-modified-p nil))
+         (kill-buffer buf)))))
 
-(ert-deftest beancount/xref-backend-references ()
+(ert-deftest beancount/xref-backend-references-accounts ()
   :tags '(xref)
   ;; Creating Xref file locations assumes a buffer backed by a file.
   (beancount-with-temp-file
@@ -423,6 +454,46 @@ and a backing file having completed the test."
     (should (equal (length (xref-backend-references 'beancount "Assets:Account2")) 2))
     (should (equal (length (xref-backend-references 'beancount "Assets:Account3")) 1))))
 
+(ert-deftest beancount/xref-backend-references-tags ()
+  :tags '(xref)
+  ;; Creating Xref file locations assumes a buffer backed by a file.
+  (beancount-with-temp-file
+      (insert "
+2019-01-10  * \"More Balances\" #tag1
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+2019-01-10  * \"Opening Balances\" #tag2
+  Assets:Account1        1.00 TDB900
+  Assets:Account2        2.00 TDB900
+
+2019-01-10  * \"More Balances\" #tag2
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+")
+    (should (equal (length (xref-backend-references 'beancount "#tag1")) 1))
+    (should (equal (length (xref-backend-references 'beancount "#tag2")) 2))))
+
+(ert-deftest beancount/xref-backend-references-links ()
+  :tags '(xref)
+  ;; Creating Xref file locations assumes a buffer backed by a file.
+  (beancount-with-temp-file
+      (insert "
+2019-01-10  * \"More Balances\" ^link1
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+
+2019-01-10  * \"Opening Balances\" ^link1
+  Assets:Account1        1.00 TDB900
+  Assets:Account2        2.00 TDB900
+
+2019-01-10  * \"More Balances\" ^link2
+  Equity:Opening-Balances
+  Assets:Account1        1.00 TDB900
+")
+    (should (equal (length (xref-backend-references 'beancount "^link1")) 2))
+    (should (equal (length (xref-backend-references 'beancount "^link2")) 1))))
+
 (ert-deftest beancount/xref-backend-apropos ()
   :tags '(xref)
   ;; Creating Xref file locations assumes a buffer backed by a file.
@@ -432,12 +503,12 @@ and a backing file having completed the test."
 2019-01-01 open Assets:Account2 TDB900
 2019-01-01 open Assets:Account3 TDB900
 
-2019-01-10  * \"Opening Balances\"
+2019-01-10  * \"Opening Balances\" #tag ^link1
   Equity:Opening-Balances
   Assets:Account1        1.00 TDB900
   Assets:Account2        2.00 TDB900
 
-2019-01-10  * \"More Balances\"
+2019-01-10  * \"More Balances\" #tag ^link2
   Equity:Opening-Balances
   Assets:Account1        1.00 TDB900
 
@@ -447,4 +518,7 @@ and a backing file having completed the test."
     (should (equal (length (xref-backend-apropos 'beancount "Assets Account1")) 3))
     (should (equal (length (xref-backend-apropos 'beancount "Equity")) 2))
     (should (equal (length (xref-backend-apropos 'beancount "Opening")) 2))
-    (should (equal (length (xref-backend-apropos 'beancount "Opening Assets")) 0))))
+    (should (equal (length (xref-backend-apropos 'beancount "Opening Assets")) 0))
+    (should (equal (length (xref-backend-apropos 'beancount "tag")) 2))
+    (should (equal (length (xref-backend-apropos 'beancount "link1")) 1))
+    (should (equal (length (xref-backend-apropos 'beancount "link2")) 1))))
