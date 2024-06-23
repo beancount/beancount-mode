@@ -162,7 +162,8 @@ from the open directive for the relevant account."
     "price"
     "query"
     "txn")
-  "Directive names that can appear after a date and are _not_ followed by an account.")
+  "Directive names that can appear after a date and are _not_ followed by an
+account.")
 
 (defconst beancount-timestamped-directive-names
   (append beancount-account-directive-names
@@ -193,6 +194,7 @@ from the open directive for the relevant account."
     "account_previous_conversions"
     "account_previous_earnings"
     "account_rounding"
+    "account_unrealized_gains"
     "allow_deprecated_none_for_tags_and_links"
     "allow_pipe_separator"
     "booking_method"
@@ -1021,20 +1023,34 @@ Only useful if you have not installed Beancount properly in your PATH.")
 
 (put 'beancount-link 'bounds-of-thing-at-point #'beancount--bounds-of-link-at-point)
 
-(defun beancount-linked ()
-  "Get the \"linked\" info from `beancount-doctor-program'."
-  (interactive)
+(defun beancount--bounds-of-tag-at-point ()
+  (when (thing-at-point-looking-at (concat "\\#[" beancount-tag-chars "]+") 128)
+    (cons (match-beginning 0) (match-end 0))))
+
+(put 'beancount-tag 'bounds-of-thing-at-point #'beancount--bounds-of-tag-at-point)
+
+(defun beancount-linked--get-target-under-point ()
+  "Get link, tag or line no under point, or nil."
   (let ((lnarg (if mark-active
                    (format "%d:%d"
                            (line-number-at-pos (region-beginning))
                            (line-number-at-pos (region-end)))
                  (format "%d" (line-number-at-pos)))))
-    (let* ((word (thing-at-point 'beancount-link))
-           (link (when (and word (string-match "\\^" word)) word)))
-      (let ((compilation-read-command nil))
-        (beancount--run beancount-doctor-program "linked"
-                        buffer-file-name
-                        (or link lnarg))))))
+    (let* ((link-word (thing-at-point 'beancount-link))
+           (link (when (and link-word (string-match "\\^" link-word)) link-word))
+           (tag-word (thing-at-point 'beancount-tag))
+           (tag (when (and tag-word (string-match "\\#" tag-word)) tag-word)))
+      (or link tag lnarg))))
+
+(defun beancount-linked ()
+  "Get the \"linked\" info from `beancount-doctor-program', either linked or tags
+transactions at point."
+  (interactive)
+  (let ((compilation-read-command nil)
+        (target (beancount-linked--get-target-under-point)))
+    (beancount--run beancount-doctor-program "linked"
+                    buffer-file-name
+                    target)))
 
 ;; Note: Eventually we'd like to be able to honor some metadata in the file that
 ;; would point to the top-level filename.
@@ -1042,7 +1058,6 @@ Only useful if you have not installed Beancount properly in your PATH.")
   "Run a command with a region as the final arguments."
   (when (use-region-p)
     (let* ((compilation-read-command nil)
-           (region-command (or command "region"))
            (args (append command
                          (list buffer-file-name
                                (format "%d:%d"
@@ -1253,6 +1268,7 @@ Essentially a much simplified version of `next-line'."
 
 (defun beancount--fava-filter (process output)
   "Open fava url as soon as the address is announced."
+  (ignore process)
   (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
       (browse-url (match-string 1 output))))
 
