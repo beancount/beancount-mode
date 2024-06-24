@@ -155,7 +155,7 @@ from the open directive for the relevant account."
     "note"
     "open"
     "pad")
-  "Directive bames that can appear after a date and are followd by an account.")
+  "Directive names that can appear after a date and are followd by an account.")
 
 (defconst beancount-no-account-directive-names
   '("commodity"
@@ -163,8 +163,10 @@ from the open directive for the relevant account."
     "price"
     "query"
     "txn")
-  "Directive names that can appear after a date and are _not_ followed by an
-account.")
+  "Directives with a date but without an account.
+
+List of directive names that can appear after a date and that are
+_not_ followed by an account.")
 
 (defconst beancount-timestamped-directive-names
   (append beancount-account-directive-names
@@ -1036,8 +1038,8 @@ Only useful if you have not installed Beancount properly in your PATH.")
 
 (put 'beancount-tag 'bounds-of-thing-at-point #'beancount--bounds-of-tag-at-point)
 
-(defun beancount-linked--get-target-under-point ()
-  "Get link, tag or line no under point, or nil."
+(defun beancount-linked--get-target-at-point ()
+  "Get link, tag or line at point, or nil."
   (let ((lnarg (if mark-active
                    (format "%d:%d"
                            (line-number-at-pos (region-beginning))
@@ -1054,7 +1056,7 @@ Only useful if you have not installed Beancount properly in your PATH.")
 transactions at point."
   (interactive)
   (let ((compilation-read-command nil)
-        (target (beancount-linked--get-target-under-point)))
+        (target (beancount-linked--get-target-at-point)))
     (beancount--run beancount-doctor-program "linked"
                     buffer-file-name
                     target)))
@@ -1273,9 +1275,8 @@ Essentially a much simplified version of `next-line'."
     (set-process-filter beancount--fava-process #'beancount--fava-filter)
     (message "Fava process started")))
 
-(defun beancount--fava-filter (process output)
+(defun beancount--fava-filter (_process output)
   "Open fava url as soon as the address is announced."
-  (ignore process)
   (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
       (browse-url (match-string 1 output))))
 
