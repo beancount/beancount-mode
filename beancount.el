@@ -37,6 +37,7 @@
 (require 'cl-lib)
 (require 'xref)
 (require 'apropos)
+(require 'rx)
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.beancount\\'" . beancount-mode))
@@ -162,7 +163,8 @@ from the open directive for the relevant account."
     "price"
     "query"
     "txn")
-  "Directive names that can appear after a date and are _not_ followed by an account.")
+  "Directive names that can appear after a date and are _not_ followed by an
+account.")
 
 (defconst beancount-timestamped-directive-names
   (append beancount-account-directive-names
@@ -193,6 +195,7 @@ from the open directive for the relevant account."
     "account_previous_conversions"
     "account_previous_earnings"
     "account_rounding"
+    "account_unrealized_gains"
     "allow_deprecated_none_for_tags_and_links"
     "allow_pipe_separator"
     "booking_method"
@@ -269,6 +272,12 @@ from the open directive for the relevant account."
 ;; This is a grouping regular expression because the subexpression is
 ;; used in determining the outline level in `beancount-outline-level'.
 (defvar beancount-outline-regexp "\\(;;;+\\|\\*+\\)")
+
+;; Regular expression for all symbols recognised by the Xref backend.
+(defconst beancount-xref-symbol-regexp
+  (rx-to-string `(or (regexp ,beancount-account-regexp)
+                     (regexp ,(concat "#[" beancount-tag-chars "]+"))
+                     (regexp ,(concat "\\^[" beancount-tag-chars "]+")))))
 
 (defun beancount-outline-level ()
   (let ((len (- (match-end 1) (match-beginning 1))))
@@ -565,7 +574,7 @@ With an argument move to the previous non cleared transaction."
                   (lambda (string pred action)
                     (if (null candidates)
                         (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
+                              (sort (beancount-collect-unique regexp 1) #'string<)))
                     (complete-with-action action candidates string pred))))
             (list (match-beginning 1) (match-end 1) completion-table)))
 
@@ -578,7 +587,7 @@ With an argument move to the previous non cleared transaction."
                   (lambda (string pred action)
                     (if (null candidates)
                         (setq candidates
-                              (sort (beancount-collect regexp 1) #'string<)))
+                              (sort (beancount-collect-unique regexp 1) #'string<)))
                     (complete-with-action action candidates string pred))))
             (list (match-beginning 1) (match-end 1) completion-table))))))))
 
@@ -944,13 +953,13 @@ Emacs-26 is dropped."
 (defun beancount-date-up-day (&optional days)
   "Increase the date in the current line by one day.
 With prefix ARG, change that many days."
-  (interactive "p" beancount-mode)
+  (interactive "p")
   (beancount--shift-date-at-point (or days 1)))
 
 (defun beancount-date-down-day (&optional days)
   "Decrease the date in the current line by one day.
 With prefix ARG, change that many days."
-  (interactive "p" beancount-mode)
+  (interactive "p")
   (beancount--shift-date-at-point (- (or days 1))))
 
 (defvar beancount-install-dir nil
@@ -1025,20 +1034,34 @@ Only useful if you have not installed Beancount properly in your PATH.")
 
 (put 'beancount-link 'bounds-of-thing-at-point #'beancount--bounds-of-link-at-point)
 
-(defun beancount-linked ()
-  "Get the \"linked\" info from `beancount-doctor-program'."
-  (interactive)
+(defun beancount--bounds-of-tag-at-point ()
+  (when (thing-at-point-looking-at (concat "\\#[" beancount-tag-chars "]+") 128)
+    (cons (match-beginning 0) (match-end 0))))
+
+(put 'beancount-tag 'bounds-of-thing-at-point #'beancount--bounds-of-tag-at-point)
+
+(defun beancount-linked--get-target-under-point ()
+  "Get link, tag or line no under point, or nil."
   (let ((lnarg (if mark-active
                    (format "%d:%d"
                            (line-number-at-pos (region-beginning))
                            (line-number-at-pos (region-end)))
                  (format "%d" (line-number-at-pos)))))
-    (let* ((word (thing-at-point 'beancount-link))
-           (link (when (and word (string-match "\\^" word)) word)))
-      (let ((compilation-read-command nil))
-        (beancount--run beancount-doctor-program "linked"
-                        buffer-file-name
-                        (or link lnarg))))))
+    (let* ((link-word (thing-at-point 'beancount-link))
+           (link (when (and link-word (string-match "\\^" link-word)) link-word))
+           (tag-word (thing-at-point 'beancount-tag))
+           (tag (when (and tag-word (string-match "\\#" tag-word)) tag-word)))
+      (or link tag lnarg))))
+
+(defun beancount-linked ()
+  "Get the \"linked\" info from `beancount-doctor-program', either linked or tags
+transactions at point."
+  (interactive)
+  (let ((compilation-read-command nil)
+        (target (beancount-linked--get-target-under-point)))
+    (beancount--run beancount-doctor-program "linked"
+                    buffer-file-name
+                    target)))
 
 ;; Note: Eventually we'd like to be able to honor some metadata in the file that
 ;; would point to the top-level filename.
@@ -1046,7 +1069,6 @@ Only useful if you have not installed Beancount properly in your PATH.")
   "Run a command with a region as the final arguments."
   (when (use-region-p)
     (let* ((compilation-read-command nil)
-           (region-command (or command "region"))
            (args (append command
                          (list buffer-file-name
                                (format "%d:%d"
@@ -1257,6 +1279,7 @@ Essentially a much simplified version of `next-line'."
 
 (defun beancount--fava-filter (process output)
   "Open fava url as soon as the address is announced."
+  (ignore process)
   (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
       (browse-url (match-string 1 output))))
 
@@ -1336,20 +1359,45 @@ beginning."
 
 (cl-defmethod xref-backend-definitions ((_ (eql beancount)) identifier)
   "Find definitions of IDENTIFIER."
-  (let ((buf (current-buffer)))
+  (let ((buf (current-buffer))
+        re mgroup)
+    (cond
+     ;; tag
+     ((string-prefix-p "#" identifier)
+      (setq re (concat "#[" beancount-tag-chars "]+"))
+      (setq mgroup 0))
+     ;; link
+     ((string-prefix-p "^" identifier)
+      (setq re (concat "\\^[" beancount-tag-chars "]+"))
+      (setq mgroup 0))
+     ;; account
+     (t
+      (setq re beancount-open-directive-regexp)
+      (setq mgroup 3)))
     (cl-loop
-     for (def-id . def-pos) in
-     (beancount-collect-pos-alist beancount-open-directive-regexp 3)
-     if (equal def-id identifier)
-     collect
-     (xref-make def-id (xref-make-buffer-location buf def-pos)))))
+       for (def-id . def-pos) in
+       (beancount-collect-pos-alist re mgroup)
+       if (equal def-id identifier)
+       collect
+       (xref-make def-id (xref-make-buffer-location buf def-pos)))))
 
 (cl-defmethod xref-backend-references ((_ (eql beancount)) identifier)
   "Find references of IDENTIFIER."
-  (let ((fname (buffer-file-name)))
+  (let ((fname (buffer-file-name))
+        re)
+    (setq re
+          (cond
+           ;; tag
+           ((string-prefix-p "#" identifier)
+            (concat "#[" beancount-tag-chars "]+"))
+           ;; link
+           ((string-prefix-p "^" identifier)
+            (concat "\\^[" beancount-tag-chars "]+"))
+           ;; account
+           (t beancount-account-regexp)))
     (cl-loop
      for (ref-id . ref-pos) in
-     (beancount-collect-pos-alist beancount-account-regexp 0)
+     (beancount-collect-pos-alist re 0)
      if (equal ref-id identifier)
      collect
      (xref-make ref-id
@@ -1373,7 +1421,7 @@ beginning."
         (fname (buffer-file-name)))
     (cl-loop
      for (ref-id . ref-pos) in
-     (beancount-collect-pos-alist beancount-account-regexp 0)
+     (beancount-collect-pos-alist beancount-xref-symbol-regexp 0)
      if (string-match-p pattern-re ref-id)
      collect
      (xref-make ref-id
@@ -1381,12 +1429,14 @@ beginning."
                  fname (line-number-at-pos ref-pos) 0)))))
 
 (cl-defmethod xref-backend-identifier-completion-table ((_ (eql beancount)))
-  (beancount-get-account-names))
+  (beancount-collect-unique beancount-xref-symbol-regexp 0))
 
 (cl-defmethod xref-backend-identifier-at-point ((_ (eql beancount)))
   "Extract a symbol at point, check if it is an account, return it"
-  (when-let ((acc (thing-at-point 'beancount-account)))
-    (substring-no-properties acc)))
+  (when-let ((thing (or (thing-at-point 'beancount-account)
+                        (thing-at-point 'beancount-link)
+                        (thing-at-point 'beancount-tag))))
+    (substring-no-properties thing)))
 
 (provide 'beancount)
 ;;; beancount.el ends here
