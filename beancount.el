@@ -233,8 +233,9 @@ _not_ followed by an account.")
   "A regular expression to match currencies.")
 
 (defconst beancount-flag-regexp
-  ;; Single char that is neither a space nor a lower-case letter.
-  "[^ a-z]")
+  ;; Single character: Certain symbols plus uppercase letters.
+  ;; case-fold-search t will cause a single lowercase letter to match also.
+  "[!#%&*?A-Z]")
 
 (defconst beancount-transaction-regexp
   (concat "^\\(" beancount-date-regexp "\\) +"
@@ -357,6 +358,7 @@ are reserved for the mode anyway.)")
     (define-key map (kbd "M-RET") #'beancount-insert-date)
     (define-key map (vconcat p [(\')]) #'beancount-insert-account)
     (define-key map (vconcat p [(control c)]) #'beancount-transaction-clear)
+    (define-key map (vconcat p [(control f)]) #'beancount-transaction-flag)
     (define-key map (vconcat p [(control l)]) #'beancount-check)
     (define-key map (vconcat p [(control q)]) #'beancount-query)
     (define-key map (vconcat p [(control x)]) #'beancount-context)
@@ -720,6 +722,17 @@ transaction as pending."
   (save-excursion
     (save-match-data
       (let ((flag (if arg "!" "*")))
+        (beancount-goto-transaction-begin)
+        (if (looking-at beancount-transaction-regexp)
+            (replace-match flag t t nil 2))))))
+
+(defun beancount-transaction-flag (arg)
+  "Prompt for a flag and set the transaction's flag to the
+response, uppercased."
+  (interactive "cFlag:")
+  (save-excursion
+    (save-match-data
+      (let ((flag (upcase (char-to-string arg))))
         (beancount-goto-transaction-begin)
         (if (looking-at beancount-transaction-regexp)
             (replace-match flag t t nil 2))))))
