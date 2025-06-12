@@ -794,8 +794,8 @@ align with the fill-column."
                                    "[ \t]+"
                                    beancount-currency-regexp)
                            line)
-         (push (length (match-string 1 line)) prefix-widths)
-         (push (length (match-string 2 line)) number-widths)
+         (push (string-width (match-string 1 line)) prefix-widths)
+         (push (string-width (match-string 2 line)) number-widths)
          )))
 
     (when prefix-widths
@@ -806,7 +806,7 @@ align with the fill-column."
              (max-prefix-width (apply 'max prefix-widths))
              (max-prefix-width
               (if requested-currency-column
-                  (max (- requested-currency-column (length number-padding) number-width 1)
+                  (max (- requested-currency-column (string-width number-padding) number-width 1)
                        max-prefix-width)
                 max-prefix-width))
              (prefix-format (format "%%-%ss" max-prefix-width))
