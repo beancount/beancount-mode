@@ -223,7 +223,7 @@ _not_ followed by an account.")
 
 (defconst beancount-account-regexp
   (concat (regexp-opt beancount-account-categories)
-          "\\(?::[[:upper:][:digit:]][[:alnum:]-_]+\\)+")
+          "\\(?::[[:upper:][:digit:]][[:alnum:]-_]*\\)+")
   "A regular expression to match account names.")
 
 (defconst beancount-number-regexp "[-+]?[0-9]+\\(?:,[0-9]\\{3\\}\\)*\\(?:\\.[0-9]*\\)?"
@@ -233,13 +233,13 @@ _not_ followed by an account.")
   "A regular expression to match currencies.")
 
 (defconst beancount-flag-regexp
-  ;; Single char that is neither a space nor a lower-case letter.
-  "[^ a-z]")
+  ;; Single character: Certain symbols plus uppercase letters.
+  ;; case-fold-search t will cause a single lowercase letter to match also.
+  "[!#%&*?A-Z]")
 
 (defconst beancount-transaction-regexp
   (concat "^\\(" beancount-date-regexp "\\) +"
-          "\\(?:txn +\\)?"
-          "\\(" beancount-flag-regexp "\\) +"
+          "\\(\\(?:txn+\\)\\|" beancount-flag-regexp "\\) +"
           "\\(\".*\"\\)"))
 
 (defconst beancount-posting-regexp
@@ -358,6 +358,7 @@ are reserved for the mode anyway.)")
     (define-key map (kbd "M-RET") #'beancount-insert-date)
     (define-key map (vconcat p [(\')]) #'beancount-insert-account)
     (define-key map (vconcat p [(control c)]) #'beancount-transaction-clear)
+    (define-key map (vconcat p [(control f)]) #'beancount-transaction-flag)
     (define-key map (vconcat p [(control l)]) #'beancount-check)
     (define-key map (vconcat p [(control q)]) #'beancount-query)
     (define-key map (vconcat p [(control x)]) #'beancount-context)
@@ -721,6 +722,17 @@ transaction as pending."
   (save-excursion
     (save-match-data
       (let ((flag (if arg "!" "*")))
+        (beancount-goto-transaction-begin)
+        (if (looking-at beancount-transaction-regexp)
+            (replace-match flag t t nil 2))))))
+
+(defun beancount-transaction-flag (arg)
+  "Prompt for a flag and set the transaction's flag to the
+response, uppercased."
+  (interactive "cFlag:")
+  (save-excursion
+    (save-match-data
+      (let ((flag (upcase (char-to-string arg))))
         (beancount-goto-transaction-begin)
         (if (looking-at beancount-transaction-regexp)
             (replace-match flag t t nil 2))))))
@@ -1263,21 +1275,21 @@ Essentially a much simplified version of `next-line'."
 (defun beancount-fava ()
   "Start (and open) or stop the fava server."
   (interactive)
-  (if beancount--fava-process
-      (progn
-        (delete-process beancount--fava-process)
-        (setq beancount--fava-process nil)
-        (message "Fava process killed"))
-    (setq beancount--fava-process
-          (start-process "fava" (get-buffer-create "*fava*") "fava"
-                         (if (eq 'beancount-mode major-mode) (buffer-file-name)
-                           (read-file-name "File to load: "))))
-    (set-process-filter beancount--fava-process #'beancount--fava-filter)
-    (message "Fava process started")))
+  (when beancount--fava-process
+    (delete-process beancount--fava-process)
+    (setq beancount--fava-process nil)
+    (message "Fava process killed"))
+  (setq beancount--fava-process
+        (start-process "fava" (get-buffer-create "*fava*") "fava"
+                       (if (eq 'beancount-mode major-mode) (buffer-file-name)
+                         (read-file-name "File to load: "))))
+  (set-process-filter beancount--fava-process #'beancount--fava-filter)
+  (message "Fava process started"))
 
 (defun beancount--fava-filter (_process output)
   "Open fava url as soon as the address is announced."
-  (if-let ((url (string-match "Running Fava on \\(http://.+:[0-9]+\\)\n" output)))
+  (with-current-buffer "*fava*" (insert output))
+  (if-let ((url (string-match "Starting Fava on \\(http://.+:[0-9]+\\)\n" output)))
       (browse-url (match-string 1 output))))
 
 ;;; Xref backend
