@@ -239,7 +239,7 @@ _not_ followed by an account.")
 
 (defconst beancount-transaction-regexp
   (concat "^\\(" beancount-date-regexp "\\) +"
-          "\\(\\(?:txn+\\)\\|" beancount-flag-regexp "\\) +"
+          "\\(\\(?:txn\\)\\|" beancount-flag-regexp "\\) +"
           "\\(\".*\"\\)"))
 
 (defconst beancount-posting-regexp
