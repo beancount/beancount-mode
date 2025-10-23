@@ -972,6 +972,89 @@ With prefix ARG, change that many days."
   (interactive "p")
   (beancount--shift-date-at-point (- (or days 1))))
 
+(defun beancount--get-date-component-at-point ()
+  "Determine which component of the date (year, month, day) the cursor is on.
+Returns `'year', `'month', `'day', or nil if not on a date."
+  (when (thing-at-point-looking-at beancount-date-regexp 10)
+    (let* ((date-start (match-beginning 0))
+           (date-end (match-end 0))
+           (pos (point))
+           (date-string (match-string 0)))
+      (cond
+       ;; Year: positions 0-3
+       ((and (>= pos date-start) (< pos (+ date-start 4)))
+        'year)
+       ;; Separator after year: position 4
+       ((= pos (+ date-start 4))
+        'year)
+       ;; Month: positions 5-6
+       ((and (>= pos (+ date-start 5)) (< pos (+ date-start 7)))
+        'month)
+       ;; Separator after month: position 7
+       ((= pos (+ date-start 7))
+        'month)
+       ;; Day: positions 8-9
+       ((and (>= pos (+ date-start 8)) (<= pos date-end))
+        'day)
+       (t nil)))))
+
+(defun beancount--shift-date-component-at-point (increment)
+  "Shift the date component at point by INCREMENT units.
+The component (year, month, or day) is determined by cursor position."
+  (if (thing-at-point-looking-at beancount-date-regexp 10)
+      (let* ((pos (point))
+             (component (beancount--get-date-component-at-point))
+             (date-string (match-string 0))
+             (date (beancount--parse-date date-string))
+             (decoded (decode-time date))
+             (second (nth 0 decoded))
+             (minute (nth 1 decoded))
+             (hour (nth 2 decoded))
+             (day (nth 3 decoded))
+             (month (nth 4 decoded))
+             (year (nth 5 decoded))
+             new-date)
+        (pcase component
+          ('year
+           (setq new-date (beancount--encode-time
+                          (list second minute hour day month (+ year increment) nil -1 nil))))
+          ('month
+           (let* ((new-month (+ month increment))
+                  (new-year year)
+                  (month-offset (if (> new-month 0)
+                                    (/ (1- new-month) 12)
+                                  (/ (- new-month 12) 12))))
+             (setq new-year (+ year month-offset))
+             (setq new-month (- new-month (* month-offset 12)))
+             ;; Handle day overflow (e.g., Jan 31 -> Feb 31 should become Feb 28/29)
+             (let ((max-day (calendar-last-day-of-month new-month new-year)))
+               (when (> day max-day)
+                 (setq day max-day)))
+             (setq new-date (beancount--encode-time
+                            (list second minute hour day new-month new-year nil -1 nil)))))
+          ('day
+           (setq new-date (beancount--encode-time
+                          (list second minute hour (+ day increment) month year nil -1 nil))))
+          (_
+           (user-error "Could not determine date component at point")))
+        (replace-match (beancount--format-date new-date) t t)
+        (goto-char pos))
+    (user-error "No date at point")))
+
+(defun beancount-date-up (&optional n)
+  "Increase the date component at point by N units (default 1).
+If cursor is on year, increment year; on month, increment month; on day,
+increment day."
+  (interactive "p")
+  (beancount--shift-date-component-at-point (or n 1)))
+
+(defun beancount-date-down (&optional n)
+  "Decrease the date component at point by N units (default 1).
+If cursor is on year, decrement year; on month, decrement month; on day,
+decrement day."
+  (interactive "p")
+  (beancount--shift-date-component-at-point (- (or n 1))))
+
 (defvar beancount-install-dir nil
   "Directory in which Beancount's source is located.
 Only useful if you have not installed Beancount properly in your PATH.")
