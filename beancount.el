@@ -202,6 +202,7 @@ _not_ followed by an account.")
     "allow_pipe_separator"
     "booking_method"
     "conversion_currency"
+    "display_precision"
     "documents"
     "infer_tolerance_from_cost"
     "inferred_tolerance_default"
@@ -216,7 +217,8 @@ _not_ followed by an account.")
     "operating_currency"
     "plugin_processing_mode"
     "render_commas"
-    "title"))
+    "title"
+    "tolerance_multiplier"))
 
 (defconst beancount-date-regexp "[0-9]\\{4\\}[-/][0-9]\\{2\\}[-/][0-9]\\{2\\}"
   "A regular expression to match dates.")
