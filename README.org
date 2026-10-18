@@ -85,6 +85,21 @@ flymake:
   (add-hook 'beancount-mode-hook #'flymake-bean-check-enable)
 #+end_src
 
+A ledger can be split into several files joined with =include=
+directives.  Set =beancount-main-file= to the file that includes the
+others, and the commands that run Beancount tools, such as
+=beancount-check= and =beancount-context=, load the whole ledger from
+any of its files.  A =.dir-locals.el= file in the top directory of the
+ledger sets it for every file of the ledger, and a relative name there
+is relative to that directory:
+
+#+begin_src elisp
+((beancount-mode . ((beancount-main-file . "main.beancount"))))
+#+end_src
+
+Emacs asks whether to apply the value.  Answer =!= to apply it and stop
+asking.
+
 The =etc/emacsrc= file contains some example configuration for
 =beancount-mode= and some experiments that may find their way into the
 main codebase.

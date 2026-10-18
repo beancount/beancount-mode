@@ -714,3 +714,106 @@ and a backing file having completed the test."
     (should (equal (length (xref-backend-apropos 'beancount "tag")) 2))
     (should (equal (length (xref-backend-apropos 'beancount "link1")) 1))
     (should (equal (length (xref-backend-apropos 'beancount "link2")) 1))))
+
+;;; Main file
+
+(defconst beancount-test-main-file-dir-locals
+  "((beancount-mode . ((beancount-main-file . \"main.beancount\"))))")
+
+(defmacro beancount-with-ledger (dir-locals &rest body)
+  "Run BODY in a buffer visiting a file included by a temporary ledger.
+The ledger's main file is main.beancount, which includes
+sub/2024.beancount; BODY runs in the buffer visiting the latter.  When
+DIR-LOCALS is non-nil, it is written to the ledger's .dir-locals.el
+file.  ROOT is bound to the ledger directory."
+  (declare (indent 1) (debug t))
+  `(let* ((root (file-name-as-directory (make-temp-file "beancount-test-" t)))
+          (enable-local-variables :all)
+          buf)
+     (unwind-protect
+         (progn
+           (make-directory (expand-file-name "sub" root))
+           (with-temp-file (expand-file-name "main.beancount" root)
+             (insert "include \"sub/2024.beancount\"\n"))
+           (with-temp-file (expand-file-name "sub/2024.beancount" root)
+             (insert "2024-01-01 open Assets:Cash\n"
+                     "2024-01-02 * \"Shop\"\n"
+                     "  Assets:Cash  -5 USD\n"
+                     "  Expenses:Food\n"))
+           (when ,dir-locals
+             (with-temp-file (expand-file-name ".dir-locals.el" root)
+               (insert ,dir-locals)))
+           (setq buf (find-file-noselect (expand-file-name "sub/2024.beancount" root)))
+           (with-current-buffer buf
+             ,@body))
+       (when (buffer-live-p buf)
+         (kill-buffer buf))
+       (delete-directory root t))))
+
+(defun beancount-test-compile-command (command &rest args)
+  "Return the command line that COMMAND, called with ARGS, passes to `compile'."
+  (let (compiled)
+    (cl-letf (((symbol-function 'compile)
+               (lambda () (interactive) (setq compiled compile-command))))
+      (apply command args))
+    compiled))
+
+(ert-deftest beancount/main-file-unset ()
+  :tags '(main-file)
+  (beancount-with-ledger nil
+    (should (equal (beancount-main-file-name) buffer-file-name))
+    (goto-char (point-min))
+    (forward-line 2)
+    (should (equal (beancount-test-compile-command #'beancount-context)
+                   "bean-doctor context 2024.beancount 3"))
+    ;; A file that does not exist yet still gets a bare line number.
+    (with-temp-buffer
+      (setq buffer-file-name (expand-file-name "new.beancount" root))
+      (should (equal (beancount--location 3) "3")))))
+
+(ert-deftest beancount/main-file-relative-name ()
+  :tags '(main-file)
+  (beancount-with-ledger beancount-test-main-file-dir-locals
+    ;; A value from .dir-locals.el is relative to its directory.
+    (should (equal (beancount-main-file-name) (expand-file-name "main.beancount" root)))
+    ;; A file-local value is relative to the file.
+    (let ((file (expand-file-name "sub/2025.beancount" root)))
+      (with-temp-file file
+        (insert "; Local Variables:\n"
+                "; beancount-main-file: \"../main.beancount\"\n"
+                "; End:\n"))
+      (with-current-buffer (find-file-noselect file)
+        (unwind-protect
+            (should (equal (beancount-main-file-name)
+                           (expand-file-name "main.beancount" root)))
+          (kill-buffer)))))
+  (beancount-with-ledger nil
+    ;; So is a value set in the buffer.
+    (setq-local beancount-main-file "../main.beancount")
+    (should (equal (beancount-main-file-name) (expand-file-name "main.beancount" root)))))
+
+(ert-deftest beancount/main-file-commands ()
+  :tags '(main-file)
+  (beancount-with-ledger beancount-test-main-file-dir-locals
+    (should (equal (beancount-test-compile-command #'beancount-check)
+                   "bean-check ../main.beancount"))
+    (goto-char (point-min))
+    (forward-line 2)
+    (should (equal (beancount-test-compile-command #'beancount-context)
+                   "bean-doctor context ../main.beancount 2024.beancount:3"))
+    (should (equal (beancount-test-compile-command #'beancount-linked)
+                   "bean-doctor linked ../main.beancount 2024.beancount:3"))
+    (let ((transient-mark-mode t))
+      (goto-char (point-min))
+      (forward-line 1)
+      (push-mark (point) t t)
+      (goto-char (point-max))
+      (should (equal (beancount-test-compile-command
+                      #'beancount-region-default (region-beginning) (region-end))
+                     "bean-doctor region ../main.beancount 2024.beancount:2:4")))
+    ;; In the main file itself, locations are bare line numbers.
+    (with-current-buffer (find-file-noselect (expand-file-name "main.beancount" root))
+      (unwind-protect
+          (should (equal (beancount-test-compile-command #'beancount-context)
+                         "bean-doctor context main.beancount 1"))
+        (kill-buffer)))))

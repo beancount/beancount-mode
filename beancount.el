@@ -1168,6 +1168,50 @@ decrement day."
   "Directory in which Beancount's source is located.
 Only useful if you have not installed Beancount properly in your PATH.")
 
+(defcustom beancount-main-file nil
+  "Main file of a ledger split with include directives.
+When non-nil, the commands that run Beancount tools load this file
+instead of the current one, and pass positions in the current file to
+bean-doctor as FILE:LINE.  A relative name set in a .dir-locals.el file
+is relative to the directory of that file.  Any other relative name is
+relative to `default-directory'.
+
+To use it for every file of a ledger, set it in a .dir-locals.el file
+in the top directory of the ledger:
+
+  ((beancount-mode . ((beancount-main-file . \"main.beancount\"))))"
+  :type '(choice (const :tag "The current file" nil) file)
+  :group 'beancount)
+
+(defun beancount--main-file-directory ()
+  "Return the directory that a relative `beancount-main-file' is relative to."
+  ;; A file-local value removes the variable from
+  ;; `dir-local-variables-alist', so a matching entry there means the
+  ;; value came from a .dir-locals.el file.
+  (let ((entry (assq 'beancount-main-file dir-local-variables-alist))
+        (locals (dir-locals-find-file (or buffer-file-name default-directory))))
+    (if (and entry locals (equal (cdr entry) beancount-main-file))
+        (if (consp locals) (car locals) locals)
+      default-directory)))
+
+(defun beancount-main-file-name ()
+  "Return the absolute name of the file that Beancount tools load.
+This is the expanded value of `beancount-main-file', or the name of the
+visited file when that option is nil.  It is nil when there is neither."
+  (if beancount-main-file
+      (expand-file-name beancount-main-file (beancount--main-file-directory))
+    buffer-file-name))
+
+(defun beancount--location (&rest lines)
+  "Return the bean-doctor location of line numbers LINES.
+LINES are in the current file.  The location includes the file name
+when the current file is not the main file."
+  (let ((lines (mapconcat #'number-to-string lines ":")))
+    (if (or (null beancount-main-file)
+            (file-equal-p (beancount-main-file-name) buffer-file-name))
+        lines
+      (concat (file-relative-name buffer-file-name) ":" lines))))
+
 (defvar beancount-check-program "bean-check"
   "Program to run to run just the parser and validator on an
   input file.")
@@ -1201,7 +1245,7 @@ Only useful if you have not installed Beancount properly in your PATH.")
   (interactive)
   (let ((compilation-read-command nil))
     (beancount--run beancount-check-program
-                    (file-relative-name buffer-file-name))))
+                    (file-relative-name (beancount-main-file-name)))))
 
 (defvar beancount-query-program "bean-query"
   "Program to run to run just the parser and validator on an
@@ -1213,7 +1257,7 @@ Only useful if you have not installed Beancount properly in your PATH.")
   ;; Don't let-bind compilation-read-command this time, since the default
   ;; command is incomplete.
   (beancount--run beancount-query-program
-                  (file-relative-name buffer-file-name) t))
+                  (file-relative-name (beancount-main-file-name)) t))
 
 (defvar beancount-doctor-program "bean-doctor"
   "Program to run the doctor commands.")
@@ -1223,8 +1267,8 @@ Only useful if you have not installed Beancount properly in your PATH.")
   (interactive)
   (let ((compilation-read-command nil))
     (beancount--run beancount-doctor-program "context"
-                    (file-relative-name buffer-file-name)
-                    (number-to-string (line-number-at-pos)))))
+                    (file-relative-name (beancount-main-file-name))
+                    (beancount--location (line-number-at-pos)))))
 
 ;; There is no length limit for links but it seems reasonable to
 ;; limit the search for the link to the 128 characters before and
@@ -1250,10 +1294,10 @@ Only useful if you have not installed Beancount properly in your PATH.")
 (defun beancount-linked--get-target-at-point ()
   "Get link, tag or line at point, or nil."
   (let ((lnarg (if mark-active
-                   (format "%d:%d"
-                           (line-number-at-pos (region-beginning))
-                           (line-number-at-pos (region-end)))
-                 (format "%d" (line-number-at-pos)))))
+                   (beancount--location
+                    (line-number-at-pos (region-beginning))
+                    (line-number-at-pos (region-end)))
+                 (beancount--location (line-number-at-pos)))))
     (let* ((link-word (thing-at-point 'beancount-link))
            (link (when (and link-word (string-match "\\^" link-word)) link-word))
            (tag-word (thing-at-point 'beancount-tag))
@@ -1267,22 +1311,20 @@ transactions at point."
   (let ((compilation-read-command nil)
         (target (beancount-linked--get-target-at-point)))
     (beancount--run beancount-doctor-program "linked"
-                    buffer-file-name
+                    (file-relative-name (beancount-main-file-name))
                     target)))
 
-;; Note: Eventually we'd like to be able to honor some metadata in the file that
-;; would point to the top-level filename.
 (defun beancount-command-on-region (rmin rmax command)
   "Run a command with a region as the final arguments."
   (when (use-region-p)
     (let* ((compilation-read-command nil)
            (args (append command
-                         (list buffer-file-name
-                               (format "%d:%d"
-                                       (line-number-at-pos rmin)
-                                       (line-number-at-pos
-                                        (if (= 0 (save-excursion (goto-char rmax) (current-column)))
-                                            (1- rmax) rmax)))
+                         (list (file-relative-name (beancount-main-file-name))
+                               (beancount--location
+                                (line-number-at-pos rmin)
+                                (line-number-at-pos
+                                 (if (= 0 (save-excursion (goto-char rmax) (current-column)))
+                                     (1- rmax) rmax)))
                                ))))
       (apply #'beancount--run args))))
 
@@ -1302,10 +1344,10 @@ transactions at point."
   "Program to run the price fetching commands.")
 
 (defun beancount-insert-prices ()
-  "Run bean-price on the current file and insert the output inline."
+  "Run bean-price on the ledger and insert the output inline."
   (interactive)
   (call-process beancount-price-program nil t nil
-                (file-relative-name buffer-file-name)))
+                (file-relative-name (beancount-main-file-name))))
 
 ;;; Transaction highlight.
 
@@ -1478,7 +1520,7 @@ Essentially a much simplified version of `next-line'."
     (message "Fava process killed"))
   (setq beancount--fava-process
         (start-process "fava" (get-buffer-create "*fava*") "fava"
-                       (if (eq 'beancount-mode major-mode) (buffer-file-name)
+                       (if (eq 'beancount-mode major-mode) (beancount-main-file-name)
                          (read-file-name "File to load: "))))
   (set-process-filter beancount--fava-process #'beancount--fava-filter)
   (message "Fava process started"))
