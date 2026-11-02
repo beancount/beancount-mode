@@ -544,6 +544,22 @@ known option nmaes."
     (beancount-date-down-day)
     (should (equal (thing-at-point 'line) "2024-05-10\n"))))
 
+
+;;; Pushtag, poptag
+
+(ert-deftest beancount/push-pop-tag-regex ()
+  (with-temp-buffer
+    (insert "pushtag #foo\npoptag #bar\npushtag foo\n")
+    (goto-char (point-min))
+    (should (re-search-forward beancount-push-pop-tag-regexp nil t))
+    (should (equal (match-string 1) "push"))
+    (should (equal (match-string 2) "#foo"))
+    (should (re-search-forward beancount-push-pop-tag-regexp nil t))
+    (should (equal (match-string 1) "pop"))
+    (should (equal (match-string 2) "#bar"))
+    (should-not (re-search-forward beancount-push-pop-tag-regexp nil t))))
+
+
 ;;; Xref backend
 
 (defun beancount-test-xref-definition-pos (identifier position)

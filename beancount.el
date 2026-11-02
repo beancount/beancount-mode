@@ -146,6 +146,12 @@ _not_ followed by an account.")
 (defconst beancount-metadata-regexp
   "^\\s-+\\([a-z][A-Za-z0-9_-]+:\\)\\s-+\\(.+\\)")
 
+;; Push/pop tag regexp
+
+(defconst beancount-push-pop-tag-regexp
+  (concat "^\\(push\\|pop\\)tag\\s-+\\(#[" beancount-tag-chars "]+\\)")
+  "Regexp matching a push/pop tag directive.")
+
 ;; Outline minor mode regexp
 
 (defconst beancount-outline-regexp
@@ -539,8 +545,7 @@ are reserved for the mode anyway.)")
   "Return list of all pushed (and not popped) tags in the region."
   (goto-char begin)
   (let ((tags (make-hash-table :test 'equal)))
-    (while (re-search-forward
-         (concat "^\\(push\\|pop\\)tag\\s-+\\(#[" beancount-tag-chars "]+\\)") end t)
+    (while (re-search-forward beancount-push-pop-tag-regexp end t)
       (if (string-equal (match-string 1) "push")
           (puthash (match-string-no-properties 2) nil tags)
         (remhash (match-string-no-properties 2) tags)))
