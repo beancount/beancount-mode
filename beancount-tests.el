@@ -560,6 +560,86 @@ known option nmaes."
     (should-not (re-search-forward beancount-push-pop-tag-regexp nil t))))
 
 
+(ert-deftest beancount/push-pop-tag-folding-range ()
+  "Test push and pop folding ranges."
+  (with-temp-buffer
+    (beancount-mode)
+    (insert "pushtag #A
+2026-01-01 * \"A\"
+  Expenses:A 10.00 USD
+  Assets:A  -10.00 USD
+poptag #A
+
+pushtag #B
+pushtag #C
+2026-01-02 * \"BC\"
+  Expenses:BC 10.00 USD
+  Assets:BC  -10.00 USD
+poptag #B
+poptag #C
+
+pushtag #D
+pushtag #E
+2026-01-03 * \"DE\"
+  Expenses:DE 10.00 USD
+  Assets:DE  -10.00 USD
+poptag #E
+poptag #D
+
+pushtag #F
+2026-01-05 * \"F\"
+  Expenses:F 10.00 USD
+  Assets:F  -10.00 USD
+
+2026-01-06 * \"G\"
+  Expenses:G 10.00 USD
+  Assets:G  -10.00 USD
+poptag #G
+
+2026-01-06 * \"G\"
+  Expenses:G 10.00 USD
+  Assets:G  -10.00 USD
+")
+
+    (let* ((get-expected-range
+            (lambda (tag)
+              (save-excursion
+                (goto-char (point-min))
+                (when (re-search-forward
+                       (concat "^\\s-*pushtag #" tag) nil t)
+                  (let ((s (line-beginning-position)))
+                    (when (re-search-forward
+                           (concat "^\\s-*poptag #" tag) nil t)
+                      (let ((e (line-beginning-position)))
+                        (cons (min s e) (max s e)))))))))
+           (get-range
+            (lambda (event tag)
+              (save-excursion
+                (goto-char (point-min))
+                (when (re-search-forward
+                       (concat "^\\s-*" event " #" tag) nil t)
+                  (goto-char (match-beginning 0))
+                  (let ((directive (beancount--tag-directive-at-line)))
+                    (when directive
+                      (apply #'beancount--tag-folding-range
+                             directive)))))))
+           (specs `(("A" . ,(funcall get-expected-range "A"))
+                    ("B" . nil)
+                    ("C" . nil)
+                    ("D" . ,(funcall get-expected-range "D"))
+                    ("E" . ,(funcall get-expected-range "E"))
+                    ("F" . nil)
+                    ("G" . nil))))
+
+      (dolist (spec specs)
+        (let ((tag (car spec))
+              (expected-range (cdr spec)))
+          (dolist (event '("pushtag" "poptag"))
+            (let ((range (funcall get-range event tag)))
+              (if expected-range
+                  (should (equal range expected-range))
+                (should-not range)))))))))
+
 ;;; Xref backend
 
 (defun beancount-test-xref-definition-pos (identifier position)

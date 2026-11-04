@@ -448,7 +448,8 @@ Value set by `beancount--build-regexps'.")
   (if (and outline-minor-mode
            (or arg (outline-on-heading-p)))
       (beancount-outline-cycle arg)
-    (indent-for-tab-command)))
+    (unless (beancount-toggle-tag-fold)
+      (indent-for-tab-command))))
 
 (defvar beancount-mode-map-prefix [(control c)]
   "The prefix key used to bind Beancount commands in Emacs")
@@ -550,6 +551,125 @@ are reserved for the mode anyway.)")
           (puthash (match-string-no-properties 2) nil tags)
         (remhash (match-string-no-properties 2) tags)))
     (hash-table-keys tags)))
+
+(defun beancount--tag-directive-at-line ()
+  "Return (LINE-BOL EVENT TAG) for a push/pop directive on the current line."
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at beancount-push-pop-tag-regexp)
+      (list (line-beginning-position)
+            (match-string-no-properties 1)
+            (match-string-no-properties 2)))))
+
+(defun beancount--tag-folding-range (line-bol opening outer)
+  "Return (PUSH-BOL . POP-BOL) for a foldable tag directive."
+  (save-excursion
+    (goto-char line-bol)
+    (let ((search (if (equal opening "push")
+                      #'re-search-forward
+                    #'re-search-backward))
+          (tags (list outer))
+          (start line-bol)
+          end
+          (valid t))
+
+      ;; For a push directive, begin scanning after the current line.
+      (when (equal opening "push")
+        (end-of-line))
+
+      ;; Scan directives, tracking nested push/pop pairs.
+      (while (and valid
+                  (not end)
+                  (funcall search beancount-push-pop-tag-regexp nil t))
+        (let ((event (match-string-no-properties 1))
+              (tag (match-string-no-properties 2)))
+          (cond
+           ((equal event opening)
+            (push tag tags))
+           ((member tag tags)
+            (setq tags (cl-delete tag tags :test #'equal :count 1)))
+           (t
+            (setq valid nil)))
+
+          ;; The outer block is closed once its tag leaves the stack.
+          (when (and valid
+                     (equal tag outer)
+                     (not (member outer tags)))
+            (setq end (line-beginning-position))
+            (unless (null tags)
+              (setq valid nil)))))
+
+      (when (and valid end)
+        (if (equal opening "push")
+            (cons start end)
+          (cons end start))))))
+
+(add-to-invisibility-spec 'beancount-tag-fold)
+
+(defun beancount--tag-fold-at-push-line (push-bol)
+  "Return the tag-fold overlay associated with PUSH-BOL, if any."
+  (let ((fold-start
+         (save-excursion
+           (goto-char push-bol)
+           (line-end-position))))
+    (cl-find-if
+     (lambda (ov)
+       (overlay-get ov 'beancount-tag-fold))
+     (overlays-at fold-start))))
+
+(defun beancount--make-tag-fold (push-bol pop-bol)
+  "Create a fold for the tag block from PUSH-BOL through POP-BOL."
+  (let* ((fold-start
+          (save-excursion
+            (goto-char push-bol)
+            (line-end-position)))
+         (fold-end
+          (save-excursion
+            (goto-char pop-bol)
+            (forward-line 1)
+            (point))))
+    (when (< fold-start fold-end)
+      (let ((fold-ov (make-overlay fold-start fold-end))
+            (bold-ov (make-overlay push-bol fold-start)))
+        (overlay-put fold-ov 'invisible 'beancount-tag-fold)
+        (overlay-put fold-ov 'display "...\n")
+        (overlay-put fold-ov 'beancount-tag-fold t)
+        (overlay-put fold-ov 'beancount-bold-ov bold-ov)
+        (overlay-put bold-ov 'face 'bold)
+        fold-ov))))
+
+(defun beancount--delete-tag-fold (fold-ov)
+  "Delete FOLD-OV and its associated bold overlay."
+  (let ((bold-ov (overlay-get fold-ov 'beancount-bold-ov)))
+    (when bold-ov
+      (delete-overlay bold-ov)))
+  (delete-overlay fold-ov))
+
+(defun beancount--delete-tag-folds-range (beg end)
+  "Remove tag folds overlapping the region from BEG to END."
+  (dolist (ov (overlays-in beg end))
+    (when (overlay-get ov 'beancount-tag-fold)
+      (beancount--delete-tag-fold ov))))
+
+(defun beancount-toggle-tag-fold ()
+  "Toggle tag fold; return nil if point not/invalid tag-directive."
+  (interactive)
+  (let ((directive (beancount--tag-directive-at-line)))
+    (when directive
+      (let ((range (apply #'beancount--tag-folding-range directive)))
+        (if (not range)
+            (beancount-message "TAG range invalid or interleaved")
+          (let* ((push-bol (car range))
+                 (pop-bol (cdr range))
+                 (existing (beancount--tag-fold-at-push-line push-bol)))
+            (if existing
+                (progn
+                  (beancount--delete-tag-fold existing)
+                  (beancount-message "TAG UNFOLDED"))
+              (beancount--make-tag-fold push-bol pop-bol)
+              (beancount-message "TAG FOLDED"))
+            (goto-char push-bol)))
+        t))))
 
 (defun beancount-goto-transaction-begin ()
   "Move the cursor to the first line of the transaction definition."
@@ -1397,6 +1517,7 @@ condition among the following:
         (beancount-message "SUBTREE"))
        (t
         ;; Default action: hide the subtree.
+        (beancount--delete-tag-folds-range (point) eos)
         (outline-hide-subtree)
         (beancount-message "FOLDED")))))))
 
